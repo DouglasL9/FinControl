@@ -107,11 +107,11 @@
                 <section id="equipe" class="scroll-mt-6 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-primary">Colaboração</p>
                     <h2 class="mt-1 text-xl font-semibold tracking-tight text-slate-900">Empresa e equipe</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-500">Na tela Empresa, o proprietário pode buscar usuários cadastrados ou enviar convite por e-mail. O convite expira em sete dias. O proprietário também pode arquivar a empresa confirmando a senha atual; os dados ficam preservados, o acesso da equipe é suspenso e a reativação fica disponível no seletor.</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Na tela Configurações, cada seção aparece conforme o seu acesso: Empresa (dados cadastrais), Identidade visual, Perfis de acesso, Equipe, Unidades e fornecedores e Arquivar empresa. Na seção Equipe, o proprietário pode buscar usuários cadastrados ou enviar convite por e-mail; o convite expira em sete dias. O proprietário também pode arquivar a empresa confirmando a senha atual na janela de confirmação; os dados ficam preservados, o acesso da equipe é suspenso e a reativação fica disponível no seletor.</p>
                     <div class="mt-5 grid gap-3 sm:grid-cols-2">
                         <div class="rounded-2xl border border-slate-100 p-4">
                             <h3 class="text-sm font-semibold text-slate-800">Proprietário</h3>
-                            <p class="mt-1 text-sm leading-5 text-slate-500">Pode convidar pessoas e personalizar cores, logo e marca d’água da empresa.</p>
+                            <p class="mt-1 text-sm leading-5 text-slate-500">Pode convidar pessoas, editar os dados cadastrais e personalizar cores, logo e marca d’água da empresa.</p>
                         </div>
                         <div class="rounded-2xl border border-slate-100 p-4">
                             <h3 class="text-sm font-semibold text-slate-800">Membro</h3>

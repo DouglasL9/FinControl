@@ -130,8 +130,8 @@
                 @endforeach
             </section>
 
-            <div class="grid gap-6 xl:grid-cols-3">
-                <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2">
+            <div @class(['grid gap-6', 'xl:grid-cols-3' => $unitTotals->isNotEmpty()])>
+                <section @class(['overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm', 'xl:col-span-2' => $unitTotals->isNotEmpty()])>
                     <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-primary">Acompanhe de perto</p>

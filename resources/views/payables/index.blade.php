@@ -15,7 +15,7 @@
                 @if ($access['view_company'])
                     <a href="{{ route('company.show') }}"
                         class="inline-flex w-fit items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-brand-primary">
-                        Gerenciar empresa
+                        Configurações
                         <span aria-hidden="true">→</span>
                     </a>
                 @endif
@@ -139,16 +139,45 @@
         @endif
 
         <section class="grid gap-6 xl:grid-cols-12">
-            @if ($access['create_contract'])
-                <article
-                    class="h-fit rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 xl:col-span-4">
-                    <div>
-                        <h2 class="font-semibold text-slate-900">Novo contrato mensal</h2>
-                        <p class="mt-1 text-sm leading-6 text-slate-500">As contas dos próximos 3 meses serão criadas
-                            automaticamente.</p>
-                    </div>
+            <div class="space-y-6 xl:col-span-12">
+                <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+                    <div class="border-b border-slate-100 px-5 py-5 sm:px-6">
+                        <div class="flex flex-col gap-4">
+<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 class="font-semibold text-slate-900">Contratos e parcelas</h2>
+                                <p class="mt-1 text-sm text-slate-500">As parcelas ficam agrupadas por contrato;
+                                    expanda para ver os detalhes.</p>
+                            </div>
+@if ($access['create_contract'])
+    @php
+        $openContractModal = $errors->hasAny(['description', 'supplier_id', 'unit_id', 'due_day', 'starts_on', 'ends_on']) || ($errors->has('amount') && old('due_day') !== null);
+    @endphp
+    <div x-data x-init="@js($openContractModal) && $nextTick(() => $refs.newContract.showModal())">
+        <button type="button" @click="$refs.newContract.showModal()"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 sm:w-auto">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            Novo contrato
+        </button>
 
-                    <form method="POST" action="{{ route('payables.contracts.store') }}" class="mt-5 space-y-4">
+        <dialog x-ref="newContract" aria-modal="true" aria-labelledby="new-contract-title"
+            @click.self="$refs.newContract.close()"
+            class="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+                <div>
+                    <h2 id="new-contract-title" class="font-semibold text-slate-900">Novo contrato mensal</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">As contas dos próximos 3 meses serão criadas automaticamente.</p>
+                </div>
+                <button type="button" @click="$refs.newContract.close()" aria-label="Fechar"
+                    class="shrink-0 rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-3.72 3.72 3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 0 1 0-1.06Z" />
+                    </svg>
+                </button>
+            </div>
+                    <form method="POST" action="{{ route('payables.contracts.store') }}" class="space-y-4 p-5 sm:p-6">
                         @csrf
                         <div>
                             <x-input-label for="description" value="Descrição do serviço" />
@@ -182,7 +211,7 @@
                             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
                                 <p class="text-sm font-medium text-amber-900">Cadastre ou reative uma unidade antes de
                                     criar contratos.</p>
-                                <a href="{{ route('company.show') }}"
+                                <a href="{{ route('company.show') }}#units"
                                     class="mt-2 inline-flex text-sm font-semibold text-brand-primary hover:brightness-90">Cadastrar
                                     unidade</a>
                             </div>
@@ -230,25 +259,16 @@
                         <p class="text-xs leading-5 text-slate-500">O valor de cada conta gerada pode ser ajustado
                             individualmente.</p>
                         @if ($availableUnits->isNotEmpty() && $availableSuppliers->isNotEmpty())
-                            <x-primary-button class="w-full justify-center">Cadastrar contrato</x-primary-button>
+                            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+<x-secondary-button type="button" @click="$refs.newContract.close()">Cancelar</x-secondary-button>
+<x-primary-button class="justify-center">Cadastrar contrato</x-primary-button>
+</div>
                         @endif
                     </form>
-                </article>
-            @endif
-
-            <div @class([
-                'space-y-6',
-                'xl:col-span-8' => $access['create_contract'],
-                'xl:col-span-12' => !$access['create_contract'],
-            ])>
-                <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
-                    <div class="border-b border-slate-100 px-5 py-5 sm:px-6">
-                        <div class="flex flex-col gap-4">
-                            <div>
-                                <h2 class="font-semibold text-slate-900">Contratos e parcelas</h2>
-                                <p class="mt-1 text-sm text-slate-500">As parcelas ficam agrupadas por contrato;
-                                    expanda para ver os detalhes.</p>
-                            </div>
+        </dialog>
+    </div>
+@endif
+</div>
                             <form method="GET" action="{{ route('payables.index') }}"
                                 class="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-4">
                                 <label class="sr-only" for="search">Buscar por fornecedor, unidade ou
@@ -516,8 +536,7 @@
                                                                                                 bloqueado após
                                                                                                 pagamento</span>
                                                                                         </div>
-                                                                                        @elseif
-                                                                                        ($access['update_amount'])
+                                                                                        @elseif ($access['update_amount'])
                                                                                         <form method="POST"
                                                                                             action="{{ route('payables.update', $payable) }}"
                                                                                             class="flex items-center gap-2"

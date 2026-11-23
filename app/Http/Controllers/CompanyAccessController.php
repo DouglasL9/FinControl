@@ -30,7 +30,7 @@ class CompanyAccessController extends Controller
     {
         $company = $this->activeCompany($request);
         $this->permissionManager($request, $company);
-        $profile = $company->permissionProfiles()->findOrFail($profileId);
+        $profile = $company->permissionProfiles()->visibleTo($request->user())->findOrFail($profileId);
 
         abort_if($profile->is_default, 403);
 
@@ -43,7 +43,7 @@ class CompanyAccessController extends Controller
     {
         $company = $this->activeCompany($request);
         $this->permissionManager($request, $company);
-        $profile = $company->permissionProfiles()->findOrFail($profileId);
+        $profile = $company->permissionProfiles()->visibleTo($request->user())->findOrFail($profileId);
 
         abort_if($profile->is_default, 403);
         abort_if($profile->members()->exists(), 409, 'Remova este perfil de todos os usuários antes de excluí-lo.');
@@ -60,6 +60,7 @@ class CompanyAccessController extends Controller
         $member = $company->users()->whereKey($userId)->firstOrFail();
 
         abort_unless($member->pivot->role !== Company::ROLE_OWNER, 403);
+        $this->abortIfMemberHasHiddenProfile($request, $company, $member);
         abort_unless(
             $actor->pivot->role === Company::ROLE_OWNER || $member->pivot->role === Company::ROLE_MEMBER,
             403,
@@ -73,6 +74,14 @@ class CompanyAccessController extends Controller
                     ->where('company_id', $company->getKey()),
             ],
         ]);
+
+        abort_unless(
+            $company->permissionProfiles()
+                ->visibleTo($request->user())
+                ->whereKey($validated['permission_profile_id'])
+                ->exists(),
+            403,
+        );
 
         $member->pivot->permission_profile_id = $validated['permission_profile_id'];
         $member->pivot->save();
@@ -89,6 +98,7 @@ class CompanyAccessController extends Controller
 
         $member = $company->users()->whereKey($userId)->firstOrFail();
         abort_unless($member->pivot->role !== Company::ROLE_OWNER, 403);
+        $this->abortIfMemberHasHiddenProfile($request, $company, $member);
 
         $validated = $request->validate([
             'role' => ['required', Rule::in([Company::ROLE_ADMIN, Company::ROLE_MEMBER])],
@@ -98,6 +108,20 @@ class CompanyAccessController extends Controller
         $member->pivot->save();
 
         return back()->with('status', 'member-role-updated');
+    }
+
+    private function abortIfMemberHasHiddenProfile(Request $request, Company $company, User $member): void
+    {
+        if ($request->user()->isSystemAdmin() || $member->pivot->permission_profile_id === null) {
+            return;
+        }
+
+        $isHidden = $company->permissionProfiles()
+            ->whereKey($member->pivot->permission_profile_id)
+            ->get()
+            ->contains(fn (CompanyPermissionProfile $profile): bool => $profile->isDeveloper());
+
+        abort_if($isHidden, 403);
     }
 
     private function activeCompany(Request $request): Company
@@ -131,7 +155,17 @@ class CompanyAccessController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:80', $nameRule],
+            'name' => [
+                'required',
+                'string',
+                'max:80',
+                $nameRule,
+                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+                    if (! $request->user()->isSystemAdmin() && CompanyPermissionProfile::isDeveloperName($value)) {
+                        $fail('Este nome é reservado.');
+                    }
+                },
+            ],
             'permissions' => ['sometimes', 'array'],
         ]);
 

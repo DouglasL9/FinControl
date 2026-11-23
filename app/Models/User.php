@@ -18,6 +18,11 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public function isSystemAdmin(): bool
+    {
+        return $this->is_system_admin === true;
+    }
+
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class)
@@ -58,6 +63,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_system_admin' => 'boolean',
         ];
     }
 }
