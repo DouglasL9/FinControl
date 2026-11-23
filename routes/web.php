@@ -1,9 +1,10 @@
 <?php
 
-use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyAccessController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyInvitationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringPayableController;
@@ -30,7 +31,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/companies', [CompanyController::class, 'store'])->name('companies.store');
     Route::post('/companies/switch', [CompanyController::class, 'switch'])->name('companies.switch');
     Route::post('/companies/{company}/archive', [CompanyController::class, 'archive'])->name('companies.archive');
+    Route::get('/documentation', [DocumentationController::class, 'show'])->name('documentation.show');
     Route::get('/company', [CompanyController::class, 'show'])->name('company.show');
+    Route::patch('/company/details', [CompanyController::class, 'updateDetails'])->name('company.details.update');
     Route::patch('/company/branding', [CompanyController::class, 'updateBranding'])->name('company.branding.update');
     Route::post('/company/units', [UnitController::class, 'store'])->name('company.units.store');
     Route::patch('/company/units/{unit}', [UnitController::class, 'update'])->name('company.units.update');

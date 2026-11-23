@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -62,6 +63,28 @@ class CompanyPermissionProfile extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public static function isDeveloperName(?string $name): bool
+    {
+        return mb_strtolower(trim((string) $name)) === Company::DEVELOPER_PROFILE_NAME;
+    }
+
+    public function isDeveloper(): bool
+    {
+        return self::isDeveloperName($this->name);
+    }
+
+    /**
+     * O perfil Dev só é visível e gerenciável por administradores do sistema.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSystemAdmin()) {
+            return $query;
+        }
+
+        return $query->whereRaw('lower(trim(name)) != ?', [Company::DEVELOPER_PROFILE_NAME]);
     }
 
     public function members(): BelongsToMany

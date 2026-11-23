@@ -12,6 +12,7 @@
         'company-switched' => 'Empresa ativa alterada.',
         'company-archived' => 'Empresa arquivada. Os dados foram mantidos e o acesso da equipe foi suspenso.',
         'company-restored' => 'Empresa reativada com sucesso.',
+        'company-details-updated' => 'Dados cadastrais da empresa atualizados.',
         'company-branding-updated' => 'Identidade visual da empresa atualizada.',
         'unit-created' => 'Unidade cadastrada com sucesso.',
         'unit-updated' => 'Dados da unidade atualizados.',

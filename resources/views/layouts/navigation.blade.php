@@ -7,7 +7,8 @@
     @php($membership = $currentCompany?->membershipFor($user))
     @php($permissions = $currentCompany?->permissionsFor($membership) ?? [])
     @php($canManagePermissions = $currentCompany?->isPermissionManager($membership) ?? false)
-    @php($canViewDashboard = ! $hasCompany || ($permissions['dashboard.view'] ?? false))
+    @php($isDeveloper = $user->isSystemAdmin() || ($currentCompany?->hasDeveloperProfile($membership) ?? false))
+    @php($canViewDashboard =! $hasCompany || ($permissions['dashboard.view'] ?? false))
     @php($canViewPayables = $hasCompany && ($permissions['payables.view'] ?? false))
     @php($canViewCompany = $hasCompany && (
         $canManagePermissions
@@ -98,6 +99,12 @@
                             Meu perfil
                         </x-dropdown-link>
 
+                        @if ($isDeveloper)
+                            <x-dropdown-link :href="route('documentation.show')">
+                                Documentação
+                            </x-dropdown-link>
+                        @endif
+
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
 
@@ -180,6 +187,12 @@
                 <x-responsive-nav-link :href="route('profile.edit')">
                     Meu perfil
                 </x-responsive-nav-link>
+
+                @if ($isDeveloper)
+                    <x-responsive-nav-link :href="route('documentation.show')">
+                        Documentação
+                    </x-responsive-nav-link>
+                @endif
 
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

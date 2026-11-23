@@ -48,7 +48,10 @@ class CompanyController extends Controller
         if ($canManagePermissions) {
             $company->load([
                 'users',
-                'permissionProfiles' => fn ($query) => $query->withCount('members')->orderBy('name'),
+                'permissionProfiles' => fn ($query) => $query
+                    ->visibleTo($request->user())
+                    ->withCount('members')
+                    ->orderBy('name'),
             ]);
         }
 
@@ -61,17 +64,116 @@ class CompanyController extends Controller
             ]);
         }
 
+        $sections = array_keys(array_filter([
+            'company' => true,
+            'branding' => $isOwner,
+            'profiles' => $canManagePermissions,
+            'team' => $isOwner || $canManagePermissions,
+            'records' => $access['units.view'] || $access['suppliers.view'],
+            'archive' => $isOwner,
+        ]));
+
         return view('companies.show', [
             'company' => $company,
             'isOwner' => $isOwner,
             'canManagePermissions' => $canManagePermissions,
             'permissions' => $permissions,
             'access' => $access,
+            'sections' => $sections,
+            'activeSection' => $this->activeSection($request, $sections),
+            'hiddenProfileIds' => $canManagePermissions && ! $request->user()->isSystemAdmin()
+                ? $company->permissionProfiles()
+                    ->whereRaw('lower(trim(name)) = ?', [Company::DEVELOPER_PROFILE_NAME])
+                    ->pluck('id')
+                    ->all()
+                : [],
             'memberCount' => $canManagePermissions ? $company->users->count() : null,
             'logoUrl' => $company->logo_path === null
                 ? null
                 : Storage::disk('public')->url($company->logo_path),
         ]);
+    }
+
+    public function updateDetails(Request $request): RedirectResponse
+    {
+        $company = $request->user()->currentCompany();
+
+        if ($company === null) {
+            return redirect()->route('dashboard');
+        }
+
+        abort_unless(
+            $company->users()
+                ->whereKey($request->user()->getKey())
+                ->wherePivot('role', Company::ROLE_OWNER)
+                ->exists(),
+            403,
+        );
+
+        $cnpj = $request->input('cnpj');
+
+        if (is_string($cnpj)) {
+            $cnpj = preg_replace('/[\s.\/-]/', '', $cnpj);
+            $request->merge(['cnpj' => $cnpj === '' ? null : $cnpj]);
+        }
+
+        $validated = $request->validateWithBag('companyDetails', [
+            'name' => ['required', 'string', 'max:255'],
+            'legal_name' => ['nullable', 'string', 'max:255'],
+            'cnpj' => ['nullable', 'digits:14'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'address' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $company->update($validated);
+
+        return redirect()
+            ->route('company.show', ['section' => 'company'])
+            ->with('status', 'company-details-updated');
+    }
+
+    /**
+     * Resolve which settings section opens first, so validation errors and
+     * success messages land on the section that produced them.
+     *
+     * @param  list<string>  $sections
+     */
+    private function activeSection(Request $request, array $sections): string
+    {
+        $errors = $request->session()->get('errors');
+        $status = $request->session()->get('status');
+        $oldModal = (string) $request->old('_modal', '');
+
+        $candidates = [
+            $request->query('section'),
+            match (true) {
+                $errors?->hasBag('companyDetails') ?? false => 'company',
+                $errors?->hasAny(['primary_color', 'accent_color', 'watermark_opacity', 'logo', 'remove_logo']) ?? false => 'branding',
+                $request->old('profile_id') !== null => 'profiles',
+                str_contains($oldModal, 'unit') || str_contains($oldModal, 'supplier') => 'records',
+                $errors?->has('password') ?? false => 'archive',
+                $errors?->has('email') ?? false => 'team',
+                default => null,
+            },
+            match (true) {
+                ! is_string($status) => null,
+                $status === 'company-details-updated' => 'company',
+                $status === 'company-branding-updated' => 'branding',
+                str_starts_with($status, 'permission-profile-') => 'profiles',
+                str_starts_with($status, 'member-'), $status === 'invitation-sent' => 'team',
+                str_starts_with($status, 'unit-'), str_starts_with($status, 'supplier-') => 'records',
+                default => null,
+            },
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && in_array($candidate, $sections, true)) {
+                return $candidate;
+            }
+        }
+
+        return $sections[0];
     }
 
     public function updateBranding(Request $request): RedirectResponse
