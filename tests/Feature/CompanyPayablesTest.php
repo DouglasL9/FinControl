@@ -29,11 +29,7 @@ function createCompanyWithMember(User $user, string $name, string $role = Compan
 
 function createDefaultCompanyAccessProfile(Company $company): CompanyPermissionProfile
 {
-    return $company->permissionProfiles()->create([
-        'name' => 'Acesso completo',
-        'permissions' => CompanyPermissionProfile::allPermissions(),
-        'is_default' => true,
-    ]);
+    return $company->createInitialPermissionProfiles();
 }
 
 function addCompanyMember(Company $company, User $user, string $role = Company::ROLE_MEMBER): void
@@ -783,7 +779,7 @@ test('a verified user can accept an invitation while belonging to another compan
     expect($membership->pivot->role)
         ->toBe(Company::ROLE_MEMBER)
         ->and((int) $membership->pivot->permission_profile_id)
-        ->toBe((int) $invitedCompany->permissionProfiles()->where('is_default', true)->value('id'))
+        ->toBe((int) $invitedCompany->permissionProfiles()->where('is_invite_default', true)->value('id'))
         ->and($invitedCompany->allows($membership, 'payables.view'))
         ->toBeTrue()
         ->and($user->fresh()->currentCompany()->is($invitedCompany))->toBeTrue();

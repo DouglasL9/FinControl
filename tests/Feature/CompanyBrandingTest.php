@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Company;
-use App\Models\CompanyPermissionProfile;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -9,11 +8,7 @@ use Illuminate\Support\Facades\Storage;
 function createCompanyForBranding(User $owner): Company
 {
     $company = Company::create(['name' => 'Empresa personalizada']);
-    $profile = $company->permissionProfiles()->create([
-        'name' => 'Acesso completo',
-        'permissions' => CompanyPermissionProfile::allPermissions(),
-        'is_default' => true,
-    ]);
+    $profile = $company->createInitialPermissionProfiles();
     $company->users()->attach($owner->getKey(), [
         'role' => Company::ROLE_OWNER,
         'permission_profile_id' => $profile->getKey(),

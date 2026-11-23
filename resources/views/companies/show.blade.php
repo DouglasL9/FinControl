@@ -50,7 +50,7 @@
                         @if ($access['suppliers.view'])
                             <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">{{ $company->suppliers->count() }} fornecedores</span>
                         @endif
-                        @if ($canManagePermissions)
+                        @if ($canViewTeam)
                             <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">{{ $memberCount }} membros</span>
                         @endif
                     </div>
@@ -287,72 +287,98 @@
                 <div>
                     <h2 class="font-semibold text-slate-900">Perfis de acesso</h2>
                     <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                        Crie perfis reutilizáveis com permissões por ação. O perfil “Acesso completo” mantém o acesso atual dos membros e não pode ser removido. Proprietários e administradores gerenciam perfis; somente o proprietário designa administradores, convida pessoas, altera os dados cadastrais e a identidade visual e arquiva a empresa. Associe cada perfil aos membros na seção Equipe.
+                        Crie perfis reutilizáveis com permissões por ação. O perfil “Administrador” mantém o acesso atual dos membros e não pode ser editado nem removido. O perfil “Padrão para convites” (inicialmente “Membro”, somente consulta) é atribuído a quem aceita um convite; só o proprietário o edita e ele não pode ser excluído. O grupo “Gestão da empresa” libera a equipe, os perfis e a identidade visual para quem não é proprietário, e ninguém concede permissões que não possui. Somente o proprietário designa administradores, convida pessoas, altera os dados cadastrais e arquiva a empresa. Associe cada perfil aos membros na seção Equipe.
                     </p>
                 </div>
 
+                @php($totalPermissions = count(\App\Models\CompanyPermissionProfile::permissionKeys()))
+                @if ($company->permissionProfiles->isEmpty())
+                    <div class="mt-5 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-6 py-10 text-center">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-full bg-brand-muted text-brand-primary">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        </span>
+                        <p class="text-sm font-semibold text-slate-800">Nenhum perfil criado ainda</p>
+                        <p class="max-w-sm text-sm text-slate-500">Use “Criar novo perfil” abaixo para definir o que cada pessoa da equipe pode fazer.</p>
+                    </div>
+                @endif
+
                 <div class="mt-5 grid gap-4 lg:grid-cols-2">
                     @foreach ($company->permissionProfiles as $profile)
-                        <article class="rounded-2xl border border-slate-200 p-4 sm:p-5">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <h3 class="font-semibold text-slate-900">{{ $profile->name }}</h3>
-                                    <p class="mt-1 text-xs text-slate-500">
-                                        {{ $profile->members_count }} usuário(s) associado(s)
-                                        @if ($profile->is_default) · Perfil padrão @endif
-                                    </p>
+                        @php($enabledCount = collect(\App\Models\CompanyPermissionProfile::normalize($profile->permissions))->filter()->count())
+                        @php($profileFormIsOpen = old('profile_id') == $profile->id)
+                        <article class="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 sm:p-5">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="truncate text-base font-semibold text-slate-900">{{ $profile->name }}</h3>
+                                    @if ($profile->is_invite_default)
+                                        <span class="rounded-full bg-brand-muted px-2.5 py-0.5 text-xs font-medium text-brand-primary">Padrão para convites</span>
+                                    @endif
+                                    @if ($profile->is_default)
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">Protegido</span>
+                                    @endif
                                 </div>
+                                <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                    <span>{{ $profile->members_count }} {{ $profile->members_count === 1 ? 'usuário' : 'usuários' }}</span>
+                                    <span aria-hidden="true">&middot;</span>
+                                    <span>{{ $enabledCount }} de {{ $totalPermissions }} permissões</span>
+                                </p>
                             </div>
 
-                            @if ($profile->is_default)
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @foreach ($permissions as $groupPermissions)
-                                        @foreach ($groupPermissions as $key => $label)
-                                            @if ($profile->permissions[$key] ?? false)
-                                                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">{{ $label }}</span>
-                                            @endif
-                                        @endforeach
-                                    @endforeach
-                                </div>
-                            @else
-                                @php($profileFormIsOpen = old('profile_id') == $profile->id)
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach ($permissions as $group => $groupPermissions)
+                                    @php($groupEnabled = collect(array_keys($groupPermissions))->filter(fn ($key) => $profile->permissions[$key] ?? false)->count())
+                                    <span @class([
+                                        'rounded-full px-2.5 py-1 text-xs font-medium',
+                                        'bg-emerald-50 text-emerald-700' => $groupEnabled > 0,
+                                        'bg-slate-100 text-slate-400' => $groupEnabled === 0,
+                                    ])>{{ $group }} · {{ $groupEnabled }}/{{ count($groupPermissions) }}</span>
+                                @endforeach
+                            </div>
+
+                            @if (in_array($profile->id, $editableProfileIds, true))
                                 @php($profileFormPermissions = $profileFormIsOpen ? old('permissions', []) : $profile->permissions)
-                                <form method="POST" action="{{ route('company.permission-profiles.update', $profile) }}" class="mt-4 space-y-4">
-                                    @csrf
-                                    @method('PATCH')
-                                    <input type="hidden" name="profile_id" value="{{ $profile->id }}">
-                                    <div>
-                                        <x-input-label for="profile_name_{{ $profile->id }}" value="Nome do perfil" />
-                                        <x-text-input id="profile_name_{{ $profile->id }}" name="name" class="mt-1" :value="$profileFormIsOpen ? old('name', $profile->name) : $profile->name" required maxlength="80" />
-                                        <x-input-error :messages="$errors->get('name')" class="mt-2" />
-                                    </div>
-                                    @foreach ($permissions as $group => $groupPermissions)
-                                        <fieldset class="rounded-xl bg-slate-50 p-3">
-                                            <legend class="px-1 text-sm font-semibold text-slate-800">{{ $group }}</legend>
-                                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                                                @foreach ($groupPermissions as $key => $label)
-                                                    <label class="flex items-start gap-2 text-sm text-slate-600">
-                                                        <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($profileFormPermissions[$key] ?? false) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
-                                                        <span>{{ $label }}</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                        </fieldset>
-                                    @endforeach
-                                    <x-input-error :messages="$errors->get('permissions')" />
-                                    <div class="flex flex-wrap justify-end gap-3">
-                                        @if ($profile->members_count === 0)
-                                            <button type="submit" form="delete_permission_profile_{{ $profile->id }}" class="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">Excluir perfil</button>
-                                        @endif
-                                        <x-primary-button>Salvar perfil</x-primary-button>
-                                    </div>
-                                </form>
-                                @if ($profile->members_count === 0)
-                                    <form id="delete_permission_profile_{{ $profile->id }}" method="POST" action="{{ route('company.permission-profiles.destroy', $profile) }}" class="hidden">
+                                <details class="group border-t border-slate-100 pt-3" @if ($profileFormIsOpen) open @endif>
+                                    <summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-brand-primary">
+                                        <span>Editar perfil</span>
+                                        <svg class="h-4 w-4 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </summary>
+                                    <form method="POST" action="{{ route('company.permission-profiles.update', $profile) }}" class="mt-4 space-y-4">
                                         @csrf
-                                        @method('DELETE')
+                                        @method('PATCH')
+                                        <input type="hidden" name="profile_id" value="{{ $profile->id }}">
+                                        <div>
+                                            <x-input-label for="profile_name_{{ $profile->id }}" value="Nome do perfil" />
+                                            <x-text-input id="profile_name_{{ $profile->id }}" name="name" class="mt-1" :value="$profileFormIsOpen ? old('name', $profile->name) : $profile->name" required maxlength="80" />
+                                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                                        </div>
+                                        @foreach ($permissions as $group => $groupPermissions)
+                                            <fieldset class="rounded-xl bg-slate-50 p-3">
+                                                <legend class="px-1 text-sm font-semibold text-slate-800">{{ $group }}</legend>
+                                                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                    @foreach ($groupPermissions as $key => $label)
+                                                        <label class="flex items-start gap-2 text-sm text-slate-600">
+                                                            <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($profileFormPermissions[$key] ?? false) @disabled(! $isOwner && ! ($access[$key] ?? false)) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
+                                                            <span>{{ $label }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            </fieldset>
+                                        @endforeach
+                                        <x-input-error :messages="$errors->get('permissions')" />
+                                        <div class="flex flex-wrap items-center justify-end gap-3">
+                                            @if ($profile->members_count === 0 && ! $profile->is_invite_default)
+                                                <button type="submit" form="delete_permission_profile_{{ $profile->id }}" class="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50">Excluir</button>
+                                            @endif
+                                            <x-primary-button>Salvar perfil</x-primary-button>
+                                        </div>
                                     </form>
-                                @endif
+                                    @if ($profile->members_count === 0 && ! $profile->is_invite_default)
+                                        <form id="delete_permission_profile_{{ $profile->id }}" method="POST" action="{{ route('company.permission-profiles.destroy', $profile) }}" class="hidden">
+                                            @csrf
+                                            @method('DELETE')
+                                        </form>
+                                    @endif
+                                </details>
                             @endif
                         </article>
                     @endforeach
@@ -376,7 +402,7 @@
                                 <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                     @foreach ($groupPermissions as $key => $label)
                                         <label class="flex items-start gap-2 text-sm text-slate-600">
-                                            <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($newProfilePermissions[$key] ?? false) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
+                                            <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($newProfilePermissions[$key] ?? false) @disabled(! $isOwner && ! ($access[$key] ?? false)) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
                                             <span>{{ $label }}</span>
                                         </label>
                                     @endforeach
@@ -473,7 +499,7 @@
                 </section>
             @endif
 
-            @if ($canManagePermissions)
+            @if ($canViewTeam)
             <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
                 <div class="border-b border-slate-100 px-5 py-5 sm:px-6">
                     <h2 class="font-semibold text-slate-900">Membros da empresa</h2>
@@ -481,9 +507,8 @@
                 </div>
                 <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto">
                     @foreach ($company->users as $member)
-                        @php($canManageProfile = $member->pivot->role !== \App\Models\Company::ROLE_OWNER && ($isOwner || $member->pivot->role === \App\Models\Company::ROLE_MEMBER))
                         @php($memberIsLocked = in_array($member->pivot->permission_profile_id, $hiddenProfileIds, true))
-                        @php($canManageProfile = $canManageProfile && ! $memberIsLocked)
+                        @php($canManageProfile = in_array($member->id, $assignableMemberIds, true))
                         @php($canManageRole = $isOwner && ! $memberIsLocked && $member->pivot->role !== \App\Models\Company::ROLE_OWNER)
                         @php($memberRoleLabel = [\App\Models\Company::ROLE_OWNER => 'Proprietário', \App\Models\Company::ROLE_ADMIN => 'Administrador'][$member->pivot->role] ?? 'Membro')
                         <li class="flex items-center justify-between gap-3 px-5 py-4 sm:px-6">
@@ -529,7 +554,7 @@
                                                 <label class="block text-sm font-medium text-slate-700" for="member_profile_{{ $member->id }}">Perfil de acesso</label>
                                                 <div class="flex items-center gap-2">
                                                     <select id="member_profile_{{ $member->id }}" name="permission_profile_id" class="min-w-0 flex-1 rounded-lg border-slate-200 py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-brand-primary focus:ring-brand-primary">
-                                                        @foreach ($company->permissionProfiles as $profile)
+                                                        @foreach ($assignableProfiles as $profile)
                                                             <option value="{{ $profile->id }}" @selected($member->pivot->permission_profile_id == $profile->id)>{{ $profile->name }}</option>
                                                         @endforeach
                                                     </select>

@@ -51,7 +51,7 @@ class AuthenticatedSessionController extends Controller
         );
 
         Notification::route('mail', $user->email)
-            ->notify(new LoginVerificationCode($code));
+            ->notify(new LoginVerificationCode($code, $user));
 
         return redirect()->route('login.code');
     }

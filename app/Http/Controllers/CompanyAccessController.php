@@ -15,12 +15,13 @@ class CompanyAccessController extends Controller
     public function storeProfile(Request $request): RedirectResponse
     {
         $company = $this->activeCompany($request);
-        $this->permissionManager($request, $company);
-        $validated = $this->profileData($request, $company);
+        $actor = $this->authorizedMember($request, $company, 'profiles.manage');
+        $validated = $this->profileData($request, $company, $actor);
 
         $company->permissionProfiles()->create([
             ...$validated,
             'is_default' => false,
+            'is_invite_default' => false,
         ]);
 
         return back()->with('status', 'permission-profile-created');
@@ -29,12 +30,13 @@ class CompanyAccessController extends Controller
     public function updateProfile(Request $request, int $profileId): RedirectResponse
     {
         $company = $this->activeCompany($request);
-        $this->permissionManager($request, $company);
+        $actor = $this->authorizedMember($request, $company, 'profiles.manage');
         $profile = $company->permissionProfiles()->visibleTo($request->user())->findOrFail($profileId);
 
         abort_if($profile->is_default, 403);
+        abort_unless($company->canEditProfile($actor, $profile), 403);
 
-        $profile->update($this->profileData($request, $company, $profile));
+        $profile->update($this->profileData($request, $company, $actor, $profile));
 
         return back()->with('status', 'permission-profile-updated');
     }
@@ -42,10 +44,11 @@ class CompanyAccessController extends Controller
     public function destroyProfile(Request $request, int $profileId): RedirectResponse
     {
         $company = $this->activeCompany($request);
-        $this->permissionManager($request, $company);
+        $actor = $this->authorizedMember($request, $company, 'profiles.manage');
         $profile = $company->permissionProfiles()->visibleTo($request->user())->findOrFail($profileId);
 
-        abort_if($profile->is_default, 403);
+        abort_if($profile->is_default || $profile->is_invite_default, 403);
+        abort_unless($company->canEditProfile($actor, $profile), 403);
         abort_if($profile->members()->exists(), 409, 'Remova este perfil de todos os usuários antes de excluí-lo.');
 
         $profile->delete();
@@ -56,15 +59,12 @@ class CompanyAccessController extends Controller
     public function assignProfile(Request $request, int $userId): RedirectResponse
     {
         $company = $this->activeCompany($request);
-        $actor = $this->permissionManager($request, $company);
+        $actor = $this->authorizedMember($request, $company, 'team.assign_profiles');
         $member = $company->users()->whereKey($userId)->firstOrFail();
 
         abort_unless($member->pivot->role !== Company::ROLE_OWNER, 403);
         $this->abortIfMemberHasHiddenProfile($request, $company, $member);
-        abort_unless(
-            $actor->pivot->role === Company::ROLE_OWNER || $member->pivot->role === Company::ROLE_MEMBER,
-            403,
-        );
+        abort_unless($company->canAssignProfileTo($actor, $member), 403);
 
         $validated = $request->validate([
             'permission_profile_id' => [
@@ -75,15 +75,18 @@ class CompanyAccessController extends Controller
             ],
         ]);
 
+        $profile = $company->permissionProfiles()
+            ->visibleTo($request->user())
+            ->whereKey($validated['permission_profile_id'])
+            ->first();
+
         abort_unless(
-            $company->permissionProfiles()
-                ->visibleTo($request->user())
-                ->whereKey($validated['permission_profile_id'])
-                ->exists(),
+            $profile !== null
+                && $company->canDelegate($actor, CompanyPermissionProfile::normalize($profile->permissions)),
             403,
         );
 
-        $member->pivot->permission_profile_id = $validated['permission_profile_id'];
+        $member->pivot->permission_profile_id = $profile->getKey();
         $member->pivot->save();
 
         return back()->with('status', 'member-permissions-updated');
@@ -112,16 +115,16 @@ class CompanyAccessController extends Controller
 
     private function abortIfMemberHasHiddenProfile(Request $request, Company $company, User $member): void
     {
-        if ($request->user()->isSystemAdmin() || $member->pivot->permission_profile_id === null) {
+        if ($member->pivot->permission_profile_id === null) {
             return;
         }
 
-        $isHidden = $company->permissionProfiles()
+        $isVisible = $company->permissionProfiles()
+            ->visibleTo($request->user())
             ->whereKey($member->pivot->permission_profile_id)
-            ->get()
-            ->contains(fn (CompanyPermissionProfile $profile): bool => $profile->isDeveloper());
+            ->exists();
 
-        abort_if($isHidden, 403);
+        abort_unless($isVisible, 403);
     }
 
     private function activeCompany(Request $request): Company
@@ -133,11 +136,11 @@ class CompanyAccessController extends Controller
         return $company;
     }
 
-    private function permissionManager(Request $request, Company $company): User
+    private function authorizedMember(Request $request, Company $company, string $permission): User
     {
         $membership = $company->membershipFor($request->user());
 
-        abort_unless($company->isPermissionManager($membership), 403);
+        abort_unless($company->allows($membership, $permission), 403);
 
         return $membership;
     }
@@ -145,6 +148,7 @@ class CompanyAccessController extends Controller
     private function profileData(
         Request $request,
         Company $company,
+        User $actor,
         ?CompanyPermissionProfile $profile = null,
     ): array {
         $nameRule = Rule::unique('company_permission_profiles', 'name')
@@ -206,6 +210,16 @@ class CompanyAccessController extends Controller
         if ($normalizedPermissions['payables.create_contract']) {
             $normalizedPermissions['units.view'] = true;
             $normalizedPermissions['suppliers.view'] = true;
+        }
+
+        if ($normalizedPermissions['team.assign_profiles']) {
+            $normalizedPermissions['team.view'] = true;
+        }
+
+        if (! $company->canDelegate($actor, $normalizedPermissions)) {
+            throw ValidationException::withMessages([
+                'permissions' => 'Você não pode conceder permissões que não possui.',
+            ]);
         }
 
         return [

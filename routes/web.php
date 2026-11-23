@@ -10,10 +10,16 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringPayableController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+Route::get('/', function (Request $request) {
+    $request->session()->reflash();
+
+    return Auth::check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
 Route::get('/dashboard', DashboardController::class)

@@ -51,16 +51,31 @@
             </a>
         </section>
 
+        <nav aria-label="Seções do perfil" class="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-2 text-sm font-medium shadow-sm">
+            @foreach (['dados' => 'Dados pessoais', 'seguranca' => 'Segurança', 'empresas' => 'Minhas empresas', 'conta' => 'Zona de risco'] as $anchor => $label)
+                <a href="#{{ $anchor }}" class="shrink-0 rounded-xl px-4 py-2 text-slate-600 transition hover:bg-brand-muted hover:text-brand-primary">{{ $label }}</a>
+            @endforeach
+        </nav>
+
         <div class="grid gap-6 xl:grid-cols-2">
-            <section class="h-fit rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
+            <section id="dados" class="scroll-mt-24 h-fit rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
                 @include('profile.partials.update-profile-information-form')
             </section>
 
-            <section class="h-fit rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
-                @include('profile.partials.update-password-form')
+            <section id="seguranca" class="scroll-mt-24 h-fit space-y-6">
+                <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
+                    @include('profile.partials.update-password-form')
+                </div>
+                <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
+                    @include('profile.partials.login-verification-info')
+                </div>
             </section>
 
-            <section class="rounded-3xl border border-rose-200/80 bg-rose-50/50 p-5 shadow-sm sm:p-7 xl:col-span-2">
+            <section id="empresas" class="scroll-mt-24 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7 xl:col-span-2">
+                @include('profile.partials.companies-list')
+            </section>
+
+            <section id="conta" class="scroll-mt-24 rounded-3xl border border-rose-200/80 bg-rose-50/50 p-5 shadow-sm sm:p-7 xl:col-span-2">
                 @include('profile.partials.delete-user-form')
             </section>
         </div>

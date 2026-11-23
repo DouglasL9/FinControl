@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Company;
+use App\Models\CompanyPermissionProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,8 +21,29 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+        $currentCompany = $user->currentCompany();
+        $profileNames = CompanyPermissionProfile::query()
+            ->whereIn('id', $user->companies()->pluck('company_user.permission_profile_id')->filter()->all())
+            ->pluck('name', 'id');
+
+        $memberships = $user->companies()
+            ->orderBy('companies.name')
+            ->get()
+            ->map(fn (Company $company): array => [
+                'company' => $company,
+                'roleLabel' => match ($company->pivot->role) {
+                    Company::ROLE_OWNER => 'Proprietário',
+                    Company::ROLE_ADMIN => 'Administrador',
+                    default => 'Membro',
+                },
+                'profileName' => $profileNames->get($company->pivot->permission_profile_id),
+                'isCurrent' => $currentCompany?->is($company) ?? false,
+            ]);
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            'memberships' => $memberships,
         ]);
     }
 

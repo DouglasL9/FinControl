@@ -1,17 +1,29 @@
 <?php
 
-it('returns a successful response', function () {
-    $response = $this->get('/');
+use App\Models\User;
 
-    $response->assertStatus(200);
+it('redirects guests from the root to the login page', function () {
+    $this->get('/')->assertRedirect(route('login'));
 });
 
-it('displays a success notification on the welcome page', function () {
-    $response = $this
-        ->withSession(['status' => 'account-deleted'])
-        ->get('/');
+it('redirects authenticated users from the root to the dashboard', function () {
+    $this->actingAs(User::factory()->create())
+        ->get('/')
+        ->assertRedirect(route('dashboard'));
+});
 
-    $response
+it('keeps the success notification when redirecting to the login page', function () {
+    $this
+        ->withSession(['status' => 'account-deleted'])
+        ->followingRedirects()
+        ->get('/')
         ->assertOk()
         ->assertSee('Conta excluída com sucesso.');
+});
+
+it('offers a registration link on the login page', function () {
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertSee('Registre-se')
+        ->assertSee(route('register'), false);
 });

@@ -1,7 +1,7 @@
 # FinControl — Especificação do Projeto
 
 > **Documento de referência funcional, técnica e operacional**  
-> **Versão:** 1.0 · **Data da linha de base:** 20/11/2026 · **Idioma:** Português (Brasil)  
+> **Versão:** 1.2 · **Data da linha de base:** 20/11/2026 · **Última revisão:** 23/11/2026 · **Idioma:** Português (Brasil)  
 > **Estado:** linha de base elaborada a partir do código disponível; metas, prazos e requisitos identificados como premissas precisam de validação pelos stakeholders.
 
 ## Como interpretar esta documentação
@@ -98,13 +98,20 @@ Não há evidência de telemetria de produto, metas aprovadas ou histórico de b
 2. **Empresas e contexto:** criar e alternar empresas; o proprietário pode arquivar uma empresa com confirmação de senha, suspendendo o acesso da equipe sem apagar os dados, e reativá-la pelo seletor.
 3. **Unidades:** cadastrar e editar unidades/sedes com endereço brasileiro (CEP, rua, número, complemento, bairro, cidade, UF e telefone); arquivar ou reativar sem apagar contratos e parcelas.
 4. **Fornecedores:** manter cadastro independente por empresa com nome obrigatório e CNPJ, contato, e-mail, telefone, endereço e observações opcionais; arquivar ou reativar preservando os vínculos.
-5. **Equipe:** busca de usuários cadastrados e envio de convites por e-mail, aceitação autenticada e registro de papel proprietário/membro.
+5. **Equipe:** busca de usuários cadastrados e envio de convites por e-mail, aceitação autenticada e registro de papel proprietário, administrador ou membro. O aceite associa o convidado como membro ao perfil de convite da empresa (“Membro”, somente consulta), nunca ao “Administrador”.
 6. **Contratos recorrentes:** cadastrar descrição, fornecedor e unidade ativos da empresa, valor mensal, dia de vencimento, início e término opcional; pausar/retomar geração.
 7. **Parcelas:** gerar ocorrências mensais até três meses à frente, editar o valor da ocorrência, marcar como paga, confirmar antes de reabrir e consultar o histórico de alteração do valor e do status, com responsável e data.
 8. **Consulta:** pesquisar descrição, fornecedor ou unidade; filtrar por status; paginar resultados. Unidades arquivadas permanecem disponíveis nos filtros históricos.
 9. **Painel:** apresentar totais globais e por unidade e uma lista curta de próximos vencimentos.
-10. **Identidade visual:** proprietário configura cores, logo e opacidade da marca d’água; as alterações são compartilhadas no espaço autenticado da empresa.
+10. **Identidade visual:** proprietário (ou quem tem a permissão `company.update_branding`) configura cores, logo e opacidade da marca d’água; as alterações são compartilhadas no espaço autenticado da empresa.
 11. **Aparência:** alternar entre modo claro e noturno em qualquer tela; a preferência é salva no navegador e, sem escolha manual, segue o tema do sistema.
+12. **Perfis de acesso:** proprietários, administradores e quem tem a permissão `profiles.manage` criam perfis reutilizáveis com permissões por ação (painel, contas a pagar, unidades, fornecedores e gestão da empresa) e os atribuem aos membros pelo botão **Gerenciar** da lista de membros, que abre uma modal com o perfil de acesso e, para o proprietário, o papel do membro. Cada empresa nasce com dois perfis: “Administrador” (`is_default`, usado pelo criador; não pode ser editado nem excluído e fica oculto para quem não o possui) e “Membro” (`is_invite_default`, badge “Padrão para convites”; somente `dashboard.view`, `payables.view`, `units.view` e `suppliers.view`; só o proprietário o edita e ele não pode ser excluído).
+13. **Dados cadastrais da empresa:** nome fantasia, razão social, CNPJ, e-mail, telefone e endereço, editáveis pelo proprietário na seção “Empresa” das configurações.
+14. **Perfil Dev e administrador do sistema:** o perfil de acesso “Dev” e a coluna `users.is_system_admin` identificam quem pode consultar a documentação técnica em `/documentation`. O perfil Dev é oculto e protegido para quem não é administrador do sistema (seção 5.1).
+15. **Configurações da empresa em seções:** a tela `/company` divide-se em Empresa, Identidade visual, Perfis de acesso, Equipe, Cadastros (unidades e fornecedores) e Arquivar; cada seção aparece conforme o acesso do usuário (identidade visual com `company.update_branding`, perfis com `profiles.manage`, equipe com `team.view` ou proprietário; a tela abre para quem tem qualquer permissão de gestão, de unidades ou de fornecedores).
+16. **Meu perfil:** dados pessoais, senha, aviso da verificação em duas etapas por e-mail, lista “Minhas empresas” (papel, perfil de acesso, empresa ativa e arquivada) e exclusão de conta em zona de risco, com navegação por âncoras.
+17. **Ajuda para usuários:** guia em linguagem simples em `/help`, com atalhos e seções por tarefa; a seção “Para desenvolvedores”, com o link da documentação técnica, só aparece para perfil Dev ou administrador do sistema.
+18. **E-mails com a marca da empresa:** o código de login e o convite usam modelos próprios; a marca é a logo/nome da empresa do convite ou a única empresa ativa do usuário, senão o nome do aplicativo (`APP_NAME=FinControl` no `.env.example`).
 
 ### 2.2 Fora de escopo nesta linha de base
 
@@ -114,7 +121,7 @@ Os itens abaixo não aparecem como funcionalidade implementada no código examin
 - Contabilidade, contas a receber, faturamento, orçamento, centro de custo ou conciliação bancária.
 - Emissão fiscal, importação automática de notas/faturas, anexos ou armazenamento de comprovantes.
 - Exportação para CSV/PDF/Excel, relatórios customizados ou integração com ERP.
-- Aprovação de pagamentos, limites por usuário, permissões granulares ou papel dedicado de contador.
+- Aprovação de pagamentos, limites por usuário ou papel dedicado de contador. (Permissões por ação existem desde a versão 1.1 por meio dos perfis de acesso; as permissões de gestão da empresa, desde a 1.2.)
 - Notificações de vencimento, lembretes de atraso ou alertas financeiros ao usuário final.
 - Gestão de contratos não mensais, pagamentos parciais, parcelamento manual, juros, multas ou recorrência semanal/anual.
 - Auditoria de alterações em contratos/equipe e trilha de eventos financeiros além das mudanças de valor e status das parcelas.
@@ -125,20 +132,30 @@ Qualquer inclusão exige análise de impacto em interface, modelo de dados, auto
 
 ### 2.3 Matriz de permissões observada
 
-| Ação | Proprietário | Membro |
-|---|:---:|:---:|
-| Consultar painel, contas, contratos, empresa e unidades | Sim | Sim |
-| Criar/alternar entre empresas ativas de que participa | Sim | Sim |
-| Arquivar empresa e reativar empresa arquivada | Sim | Não |
-| Cadastrar, editar, arquivar e reativar unidade ou fornecedor | Sim | Sim |
-| Alterar cores, logo e marca d’água da empresa | Sim | Não |
-| Criar contrato, ajustar parcela, marcar paga/reabrir | Sim | Sim |
-| Pesquisar usuários para convite | Sim | Não |
-| Enviar convite à equipe | Sim | Não |
-| Aceitar convite para outra empresa | Sim, se convidado | Sim, se convidado |
-| Administrar papéis ou remover outro membro | Não implementado | Não implementado |
+O acesso combina **papel** (`owner`, `admin`, `member`) e **perfil de acesso** (conjunto de permissões por ação). O proprietário tem sempre todas as permissões; administradores e membros seguem o perfil que lhes foi atribuído. O papel `admin` garante, além do perfil, `team.view`, `team.assign_profiles` e `profiles.manage` (o acesso que já tinha antes do grupo de gestão). **Anti-escalada:** quem não é proprietário só cria, edita ou atribui perfis contidos nas próprias permissões; não altera o próprio perfil, o do proprietário, o de administradores nem o de membros com mais permissões; não edita perfis em uso pelo proprietário ou por outro administrador; perfis ocultos continuam protegidos.
 
-**Observação:** a aplicação atualmente usa dois papéis (`owner` e `member`). A lista não é um sistema completo de autorização granular. Usuários não proprietários têm acesso operacional amplo às contas da empresa.
+| Ação | Proprietário | Administrador | Membro |
+|---|:---:|:---:|:---:|
+| Consultar painel, contas, unidades e fornecedores | Sim | Conforme o perfil | Conforme o perfil |
+| Criar contrato, ajustar parcela, marcar paga/reabrir, pausar contrato | Sim | Conforme o perfil | Conforme o perfil |
+| Cadastrar, editar, arquivar e reativar unidade ou fornecedor | Sim | Conforme o perfil | Conforme o perfil |
+| Criar/alternar entre empresas ativas de que participa | Sim | Sim | Sim |
+| Visualizar membros da equipe (`team.view`) | Sim | Sim | Conforme o perfil |
+| Criar, editar e excluir perfis de acesso (`profiles.manage`) | Sim | Sim (limitado às próprias permissões) | Conforme o perfil (limitado às próprias permissões) |
+| Atribuir perfil a um membro (`team.assign_profiles`) | Sim (a qualquer não proprietário) | Somente a membros, sem exceder as próprias permissões | Conforme o perfil: somente a outros membros, sem exceder as próprias permissões |
+| Designar administrador / alterar papel | Sim | Não | Não |
+| Pesquisar usuários e enviar convite | Sim | Não | Não |
+| Editar identidade visual (`company.update_branding`) | Sim | Conforme o perfil | Conforme o perfil |
+| Editar dados cadastrais | Sim | Não | Não |
+| Arquivar e reativar empresa | Sim | Não | Não |
+| Aceitar convite para outra empresa | Sim, se convidado | Sim, se convidado | Sim, se convidado |
+| Ver, editar, excluir ou atribuir o perfil Dev | Somente administrador do sistema | Somente administrador do sistema | Não |
+| Consultar a documentação em `/documentation` | Se for Dev ou administrador do sistema | Se for Dev ou administrador do sistema | Se for Dev |
+| Remover outro membro | Não implementado | Não implementado | Não implementado |
+
+**Permissões disponíveis (18):** `dashboard.view`; `payables.view`, `payables.create_contract`, `payables.update_amount`, `payables.change_payment_status`, `payables.manage_contract`; `units.view`, `units.create`, `units.update`, `units.archive`; `suppliers.view`, `suppliers.create`, `suppliers.update`, `suppliers.archive`; gestão da empresa: `team.view`, `team.assign_profiles`, `profiles.manage`, `company.update_branding`. Habilitar uma ação habilita também a consulta do módulo correspondente (`team.assign_profiles` habilita `team.view`). As permissões de gestão nascem desativadas no perfil “Administrador” e no perfil de convite “Membro”.
+
+**Observação:** o catálogo é fixo no código (`CompanyPermissionProfile::GROUPS`). Perfis são por empresa; o nome é único dentro da empresa.
 
 ### 2.4 Fluxos principais
 
@@ -147,7 +164,7 @@ Qualquer inclusão exige análise de impacto em interface, modelo de dados, auto
 1. Visitante cria usuário com nome, e-mail e senha.
 2. A aplicação envia a verificação de endereço pelo fluxo padrão do Laravel.
 3. Usuário informa e-mail e senha na tela de login.
-4. Após autenticação inicial, o sistema cria um desafio e envia um código de seis dígitos por e-mail.
+4. Após autenticação inicial, o sistema cria um desafio e envia um código de seis dígitos por e-mail (modelo com a marca e saudação pelo primeiro nome).
 5. Usuário informa o código em até 10 minutos; são permitidas até cinco tentativas inválidas.
 6. Sessão autenticada é criada; o acesso ao painel exige também endereço verificado.
 7. Sem empresa, o painel solicita a criação do primeiro espaço.
@@ -163,16 +180,30 @@ Qualquer inclusão exige análise de impacto em interface, modelo de dados, auto
 
 #### Fluxo E — personalizar o espaço da empresa
 
-1. Proprietário escolhe cor principal, cor de destaque, logo e opacidade da marca d’água.
+1. Proprietário (ou membro com `company.update_branding`) escolhe cor principal, cor de destaque, logo e opacidade da marca d’água.
 2. O sistema valida e armazena as preferências na empresa ativa; a própria logo é usada no menu, no cabeçalho da modal de parcelas e como marca d’água.
-3. Membros veem a identidade compartilhada, mas não podem alterá-la.
+3. Os demais membros veem a identidade compartilhada, mas não podem alterá-la.
 
 #### Fluxo C — compartilhar empresa
 
 1. Proprietário pesquisa pessoa cadastrada ou digita e-mail.
 2. Sistema valida a autorização, registra/atualiza convite e envia link com token.
 3. O convidado autentica-se com o e-mail exato do convite (comparação sem distinção entre maiúsculas/minúsculas).
-4. Se válido e não expirado, aceita convite; transação associa usuário como membro e ativa a empresa na sessão.
+4. Se válido e não expirado, aceita convite; transação associa usuário como membro com o perfil de convite (`is_invite_default`) e ativa a empresa na sessão. Se a empresa não tiver perfil de convite, o membro entra sem perfil (nenhuma permissão) até o proprietário atribuir um.
+5. Em seguida, o proprietário ou um administrador pode ajustar o perfil do novo membro (Fluxo F).
+
+#### Fluxo F — gerenciar acesso de um membro
+
+1. Em Configurações > Equipe, o proprietário, o administrador ou o membro com `team.assign_profiles` clica em **Gerenciar** na linha do membro.
+2. A modal “Gerenciar acesso” mostra o **perfil de acesso** (proprietário e administrador, este somente para membros) e o **papel na empresa** (somente proprietário: Membro ou Administrador).
+3. Cada formulário é enviado separadamente (“Salvar perfil” e “Atualizar papel”) e o servidor revalida o papel de quem altera e o escopo da empresa.
+4. O proprietário não possui o botão. Quem não pode gerenciar determinado membro também não o vê.
+
+#### Fluxo G — consultar a documentação técnica
+
+1. Usuário com o perfil Dev, ou administrador do sistema, abre o dropdown do usuário e escolhe **Documentação**.
+2. O sistema exibe este documento (`docs/PROJETO.md`) com índice lateral, filtro de seções e destaque da seção em leitura; o cabeçalho tem subtítulo para a equipe técnica e o botão **Guia para usuários** (`/help`). Demais usuários recebem 403.
+3. Também é possível chegar pela seção recolhida “Para desenvolvedores” da ajuda.
 
 #### Fluxo D — alternar empresa
 
@@ -214,7 +245,7 @@ flowchart LR
 | Views | Renderizam páginas e formulários com Blade. | [dashboard.blade.php](../resources/views/dashboard.blade.php), [resources/views/payables](../resources/views/payables), [resources/views/companies](../resources/views/companies), [resources/views/auth](../resources/views/auth) |
 | Front-end | Estilos Tailwind, compilação Vite e interatividade leve Alpine.js. | [resources/css](../resources/css), [resources/js](../resources/js), [vite.config.js](../vite.config.js) |
 | Persistência | Relacionamentos, índices, chaves estrangeiras, unicidade de recorrências e valores decimais. | [database/migrations](../database/migrations) |
-| Notificações | Envio de código de login e convite por e-mail. | [app/Notifications](../app/Notifications) |
+| Notificações | Envio de código de login e convite por e-mail, em modelos Markdown com a marca da empresa (logo ou nome) e saudação pelo primeiro nome; o trait `BuildsBrandedMail` escolhe a marca. | [app/Notifications](../app/Notifications), [resources/views/mail](../resources/views/mail), [resources/views/vendor/mail](../resources/views/vendor/mail) |
 | Execução periódica | Gera parcelas pendentes diariamente às 01:00, sem sobreposição agendada. | [routes/console.php](../routes/console.php), [GenerateUpcomingPayables.php](../app/Console/Commands/GenerateUpcomingPayables.php) |
 
 ### 3.3 Diagrama de dados conceitual
@@ -223,6 +254,8 @@ flowchart LR
 erDiagram
     USERS ||--o{ COMPANY_USER : participa
     COMPANIES ||--o{ COMPANY_USER : possui
+    COMPANIES ||--o{ COMPANY_PERMISSION_PROFILES : define
+    COMPANY_PERMISSION_PROFILES |o--o{ COMPANY_USER : concede
     COMPANIES ||--o{ UNITS : organiza
     COMPANIES ||--o{ SUPPLIERS : cadastra
     COMPANIES ||--o{ RECURRING_PAYABLES : define
@@ -242,10 +275,16 @@ erDiagram
         string name
         string email UK
         timestamp email_verified_at
+        boolean is_system_admin
     }
     COMPANIES {
         bigint id PK
         string name
+        string legal_name
+        char cnpj
+        string email
+        string phone
+        text address
         boolean is_active
         string primary_color
         string accent_color
@@ -256,6 +295,15 @@ erDiagram
         bigint company_id PK, FK
         bigint user_id PK, FK
         string role
+        bigint permission_profile_id FK
+    }
+    COMPANY_PERMISSION_PROFILES {
+        bigint id PK
+        bigint company_id FK
+        string name
+        json permissions
+        boolean is_default
+        boolean is_invite_default
     }
     UNITS {
         bigint id PK
@@ -380,8 +428,10 @@ O serviço é acionado ao cadastrar contrato e pelo comando diário. A chave ún
 
 - **Monólito MVC:** interface Blade e regras no servidor; não há API pública identificada.
 - **Isolamento por empresa ativa:** consultas de contas e contratos partem do relacionamento da empresa corrente. Não há evidência de bancos ou schemas separados por empresa.
-- **Autorização mista:** middleware exige usuário e e-mail verificado nas rotas de negócio; operações de convite também verificam o papel de proprietário. A maioria das operações financeiras está disponível para qualquer membro da empresa.
-- **Fila e e-mail:** [.env.example](../.env.example) define fila em banco e e-mail em `log`, mas as notificações observadas não são enfileiradas explicitamente. A operação real depende do transporte configurado.
+- **Autorização por papel e perfil:** middleware exige usuário e e-mail verificado nas rotas de negócio. Convites, papéis, dados cadastrais e arquivamento verificam o papel `owner`; equipe, perfis e identidade visual verificam as permissões de gestão (`Company::allows`, com as garantias do papel `admin`) e as regras anti-escalada `Company::canDelegate`, `canAssignProfileTo` e `canEditProfile`; as operações de negócio verificam a permissão do perfil de acesso do membro. O proprietário tem todas as permissões.
+- **Perfil Dev e administrador do sistema:** o escopo `CompanyPermissionProfile::visibleTo` oculta o perfil cujo nome é “Dev” (sem diferenciar maiúsculas e minúsculas) de quem não é administrador do sistema; criação, edição, exclusão, atribuição e renomeação para esse nome também são bloqueadas no servidor. A flag `users.is_system_admin` não é preenchível por formulário e só é alterada diretamente no banco.
+- **Documentação interna:** a rota `/documentation` converte `docs/PROJETO.md` em HTML no servidor (HTML bruto removido), gera âncoras e índice e é restrita a perfil Dev ou administrador do sistema.
+- **Fila e e-mail:** [.env.example](../.env.example) define fila em banco e e-mail em `log` (e `APP_NAME=FinControl`), mas as notificações observadas não são enfileiradas explicitamente. Os e-mails de login e de convite usam `->markdown()` com os modelos `mail.login-code` e `mail.company-invitation` e o tema publicado em `resources/views/vendor/mail`. A operação real depende do transporte configurado.
 - **Agendamento:** frequência diária às 01:00 com `withoutOverlapping`; não há evidência nesta linha de base de alertas de falha ou monitoramento do scheduler.
 - **Idempotência:** `firstOrCreate` associado à unicidade `recurring_payable_id + due_date`.
 - **Valores:** persistidos como decimal; apresentação usa formatação brasileira e R$.
@@ -397,10 +447,11 @@ O serviço é acionado ao cadastrar contrato e pelo comando diário. A chave ún
 | Cadastro / Login / Verificação | `/register`, `/login`, `/login/verify` | Identidade, credenciais e código enviado por e-mail em layout público responsivo compartilhado. |
 | Visão geral | `/dashboard` | Cabeçalho em destaque, cartões financeiros, próximos vencimentos, totais por unidade ou formulário inicial para criar empresa. |
 | Contas a pagar | `/payables` | Cabeçalho destacado, resumo, totais por unidade, cadastro de contrato, pausa/retomada, busca, filtros, parcelas, pagamentos e histórico de alterações por parcela. |
-| Empresa | `/company` | Cabeçalho da empresa, cadastrar unidades e fornecedores, ajustar identidade visual, listar equipe, procurar/convidar usuários e, para o proprietário, arquivar a empresa mediante senha. |
+| Empresa (configurações) | `/company` | Cabeçalho “Espaço da empresa” e seções por abas conforme o acesso: dados cadastrais, identidade visual, perfis de acesso, equipe (convites e lista de membros com a modal **Gerenciar**), unidades e fornecedores e, para o proprietário, arquivar a empresa mediante senha. |
 | Aceitar convite | `/company-invitations/{token}` | Resumo da empresa e aceite autenticado do convite. |
-| Perfil | `/profile` | Cabeçalho da conta, atualizar perfil/senha e excluir conta. |
-| Ajuda e documentação | `/help` | Guia prático de empresas, unidades, contratos, parcelas, equipe e perfil, acessível a partir do perfil. |
+| Perfil | `/profile` | “Meu perfil”: cabeçalho, resumo da conta com selo de e-mail verificado, atalho para a ajuda, barra de âncoras (Dados pessoais, Segurança, Minhas empresas, Zona de risco), dados pessoais, senha, aviso da verificação em duas etapas por e-mail, lista “Minhas empresas” (papel Proprietário/Administrador/Membro, perfil de acesso e marcas “Empresa ativa” e “Arquivada”; `ProfileController::edit` envia `memberships`) e exclusão de conta. |
+| Documentação técnica | `/documentation` | Este documento com índice lateral e filtro, subtítulo para a equipe técnica e botão “Guia para usuários”; somente perfil Dev ou administrador do sistema, acessível pelo dropdown do usuário. |
+| Ajuda | `/help` | “Como usar o FinControl”, em linguagem simples para o usuário final: boas-vindas, três atalhos, barra de seções e seis cartões (primeiros passos, contas a pagar, empresa e equipe, quem pode fazer o quê, acesso e segurança, dúvidas frequentes). A seção recolhida “Para desenvolvedores” só aparece para perfil Dev ou administrador do sistema. Acessível a partir do perfil e da documentação. |
 | Aparência | Global | Alternância entre modo claro e noturno, com preferência salva no navegador. |
 
 ### 3.7 Wireframes conceituais
@@ -458,6 +509,12 @@ O serviço é acionado ao cadastrar contrato e pelo comando diário. A chave ún
 | [E-mail________________] [Enviar]   |                                 |
 | Convites pendentes                  |                                 |
 +-----------------------------------------------------------------------+
+
+Membros da empresa (lista compacta):
+| [Avatar] Nome / e-mail                       [Papel]  [Gerenciar]     |
+Modal “Gerenciar acesso”:
+| Perfil de acesso  [seletor________] [Salvar perfil]                   |
+| Papel na empresa  [Membro/Admin___] [Atualizar papel]  (só proprietário)|
 ```
 
 #### Perfil e telas de acesso
@@ -465,8 +522,10 @@ O serviço é acionado ao cadastrar contrato e pelo comando diário. A chave ún
 ```text
 Perfil:
 | Cabeçalho em destaque: Meu perfil                                    |
-| [Avatar] [Nome / e-mail] [Status de verificação]                     |
-| [Informações pessoais]            | [Segurança e senha]               |
+| [Avatar] [Nome / e-mail] [Status de verificação]  [Abrir guia]        |
+| [Dados pessoais] [Segurança] [Minhas empresas] [Zona de risco]        |
+| [Informações pessoais]            | [Senha] [Verificação em 2 etapas] |
+| [Minhas empresas: nome · papel · perfil · Empresa ativa / Arquivada]   |
 | [Excluir conta — área de risco, separada dos formulários]              |
 
 Cadastro / login / recuperação:
@@ -475,10 +534,14 @@ Cadastro / login / recuperação:
 |                                     | [Ação principal]                 |
 | Em telas estreitas, a marca e o formulário ficam em um cartão único.  |
 
-Ajuda e documentação:
-| Índice lateral/rolável             | Primeiros passos                 |
-|                                    | Contratos e parcelas             |
-|                                    | Empresa, equipe e perfil         |
+Ajuda (/help):
+| Como usar o FinControl                          [Voltar ao perfil]   |
+| [Estou começando] [Quero acompanhar uma conta] [Quero chamar alguém] |
+| [Primeiros passos] [Contas] [Equipe] [Permissões] [Segurança] [FAQ]  |
+| Cartões por tarefa; [Para desenvolvedores] recolhido (só Dev/admin)  |
+
+Documentação (/documentation, só Dev/admin do sistema):
+| Índice lateral/rolável  | Conteúdo de PROJETO.md   [Guia para usuários] |
 ```
 
 ---
@@ -506,11 +569,17 @@ Prioridades: **P0** = essencial para operação do escopo atual; **P1** = import
 | RF13 | P0 | Exibir resumo geral e por unidade; **implementado no código**. | Painel calcula aberto, a vencer, pago no mês e em atraso; totais correspondem a parcelas e à data corrente; lista até seis próximos vencimentos pendentes. |
 | RF14 | P0 | Gerar parcelas diariamente; **implementado no código; operação externa depende do scheduler**. | Agendamento chama `payables:generate` diariamente às 01:00; não inicia execução sobreposta; comando informa quantidade criada; contratos de empresas arquivadas não geram parcelas. |
 | RF15 | P1 | Atualizar perfil e excluir conta com confirmação de senha; **implementado no código**. | E-mail alterado perde marcação de verificado; exclusão exige senha; propriedade é transferida para membro remanescente ou empresa sem membros é removida. |
-| RF16 | P1 | Personalizar identidade visual da empresa; **implementado no código**. | Apenas proprietário altera cores, logo e opacidade; tema aparece para membros no espaço autenticado; logo aceita PNG/JPEG/WebP até 2 MB; opacidade de 0 a 30%; remoção ou substituição limpa o arquivo anterior. |
+| RF16 | P1 | Personalizar identidade visual da empresa; **implementado no código**. | Proprietário ou membro com `company.update_branding` altera cores, logo e opacidade; tema aparece para membros no espaço autenticado; logo aceita PNG/JPEG/WebP até 2 MB; opacidade de 0 a 30%; remoção ou substituição limpa o arquivo anterior. |
 | RF17 | P0 | Cadastrar, editar e arquivar fornecedores por empresa; **implementado no código**. | Nome obrigatório; CNPJ, contato, e-mail, telefone, endereço e observações opcionais; CNPJ normalizado e único por empresa; arquivamento reversível preserva contratos vinculados. |
 | RF18 | P0 | Selecionar fornecedor cadastrado no contrato recorrente; **implementado no código**. | Apenas fornecedor ativo da empresa pode ser selecionado; alteração do fornecedor atualiza o contrato e as próximas parcelas, sem reescrever o nome histórico já gravado nas parcelas existentes. |
 | RF19 | P1 | Arquivar e reativar empresa; **implementado no código**. | Apenas proprietário pode arquivar e deve confirmar a senha atual; a equipe perde acesso, dados e convites permanecem guardados, convites não são aceitos durante o arquivamento e a empresa pode ser reativada pelo seletor. |
 | RF20 | P1 | Alternar o tema visual; **implementado no código**. | Controle de tema disponível nas telas públicas, de autenticação e autenticadas; preferência manual persiste no navegador, e a preferência do sistema é usada antes da primeira escolha. |
+| RF21 | P1 | Gerenciar perfis de acesso e atribuí-los a membros; **implementado no código**. | Proprietário, administrador ou perfil com `profiles.manage`/`team.assign_profiles`; quem não é proprietário só atribui a outros membros e não concede, edita nem atribui perfis além das próprias permissões; perfil “Administrador” não pode ser editado nem excluído; perfil de convite só é editado pelo proprietário e não pode ser excluído; perfil em uso não pode ser excluído; nome único por empresa; permissões válidas e consistentes com a consulta do módulo. |
+| RF22 | P1 | Editar dados cadastrais da empresa; **implementado no código**. | Apenas proprietário; nome obrigatório; CNPJ com 14 dígitos (máscara ignorada); e-mail válido; telefone até 32 e endereço até 1000 caracteres. |
+| RF23 | P1 | Restringir e exibir o perfil Dev e a documentação; **implementado no código**. | Perfil Dev invisível e imutável para quem não é administrador do sistema, inclusive por requisição direta; `/documentation` devolve 403 a quem não é Dev nem administrador do sistema; o link só aparece para quem tem acesso. |
+| RF24 | P1 | Listar no perfil as empresas do usuário e seu nível de acesso; **implementado no código**. | “Minhas empresas” mostra, por empresa, papel (Proprietário/Administrador/Membro), nome do perfil de acesso quando houver, “Empresa ativa” e “Arquivada”; sem vínculos, exibe mensagem vazia; o aviso de verificação em duas etapas cita o e-mail da conta. |
+| RF25 | P1 | Oferecer ajuda em linguagem de usuário final; **implementado no código**. | `/help` exige login e traz as seis seções por tarefa; “Para desenvolvedores” e o link da documentação só aparecem para perfil Dev ou administrador do sistema. |
+| RF26 | P1 | Enviar e-mails de login e convite com a marca da empresa; **implementado no código**. | Mensagens em modelo Markdown com logo ou nome da empresa (padrão: nome do aplicativo); convite informa validade de 7 dias; código informa validade de 10 minutos. |
 
 ### 4.2 Requisitos não funcionais
 
@@ -526,7 +595,7 @@ Prioridades: **P0** = essencial para operação do escopo atual; **P1** = import
 | RNF08 | P1 | Manutenibilidade e regressão; **fundação presente**. | Mudanças críticas têm teste automatizado adequado; migrations são reversíveis quando possível; documentação compatível com a versão implantada. |
 | RNF09 | P1 | Governança documental; **regra definida neste documento**. | Mudança de requisito, fluxo, tela, dado, integração, segurança ou operação revisa este documento e o README na mesma entrega. |
 | RNF10 | P2 | Escalabilidade; **limites e capacidade não definidos**. | Antes de ampliar volume, medir consultas/agregações, frequência do scheduler, conexões e infraestrutura contra perfil aprovado. |
-| RNF11 | P1 | Segurança de ativos de marca; **implementado no código**. | Uploads exigem autenticação, papel de proprietário, validação de tipo/tamanho e não aceitam SVG; arquivos ficam no disco público apenas por serem imagens de marca. |
+| RNF11 | P1 | Segurança de ativos de marca; **implementado no código**. | Uploads exigem autenticação, proprietário ou permissão `company.update_branding`, validação de tipo/tamanho e não aceitam SVG; arquivos ficam no disco público apenas por serem imagens de marca. |
 
 ---
 
@@ -535,13 +604,15 @@ Prioridades: **P0** = essencial para operação do escopo atual; **P1** = import
 ### 5.1 Empresas e autorização
 
 1. Uma pessoa pode participar de múltiplas empresas; o contexto ativo é mantido na sessão.
-2. Ao criar empresa, o usuário criador recebe papel `owner`; aceite de convite cria papel `member`.
+2. Ao criar empresa, o usuário criador recebe papel `owner`; aceite de convite cria papel `member` com o perfil de convite da empresa (“Membro”, somente consulta).
 3. Se a empresa ativa registrada na sessão não pertencer mais ao usuário, o método de resolução tenta a primeira empresa associada por identificador.
-4. Qualquer membro pode operar contas da empresa. Somente proprietário pode pesquisar usuários e emitir convites.
+4. A operação das contas, unidades e fornecedores depende das permissões do perfil de acesso do membro. Somente proprietário pode pesquisar usuários, emitir convites, designar administradores, editar dados cadastrais e arquivar a empresa. Proprietário e administrador gerenciam perfis de acesso; membros comuns também podem ver a equipe, gerenciar e atribuir perfis e alterar a identidade visual quando o perfil concede as permissões de gestão correspondentes.
 5. O escopo das consultas deve sempre começar pela empresa ativa. IDs enviados pelo navegador não substituem a validação de pertencimento.
 6. Ao excluir conta, a propriedade de cada empresa é transferida ao membro remanescente de menor ID; se não houver sucessor, a empresa é excluída.
-7. Não existe fluxo administrativo para remover membro ou transferir propriedade manualmente além da regra de exclusão de conta.
-8. A identidade visual pertence à empresa ativa e é compartilhada com todos os membros. Somente proprietários podem alterá-la; ao excluir o último proprietário e a empresa, a logo armazenada também é removida.
+7. Não existe fluxo administrativo para remover membro ou transferir propriedade manualmente além da regra de exclusão de conta. O papel de um membro pode ser alterado apenas entre `member` e `admin`, e o proprietário não pode ter papel ou perfil alterados.
+8. A identidade visual pertence à empresa ativa e é compartilhada com todos os membros. Somente o proprietário e quem tem `company.update_branding` podem alterá-la; ao excluir o último proprietário e a empresa, a logo armazenada também é removida.
+9. **Perfil Dev:** o nome “Dev” é reservado. Quem não é administrador do sistema não o vê em listas ou seletores, não o cria nem renomeia outro perfil para esse nome (“Este nome é reservado”), e não o edita, exclui ou atribui (404/403). Membros que já usam o perfil Dev também não podem ter perfil ou papel alterados por quem não é administrador do sistema.
+10. **Administrador do sistema:** definido por `users.is_system_admin`; vê e gerencia o perfil Dev e acessa a documentação. Não há tela para marcar administradores: a alteração é feita no banco.
 
 ### 5.2 Convites
 
@@ -592,7 +663,9 @@ Prioridades: **P0** = essencial para operação do escopo atual; **P1** = import
 | Código inválido de login | Erro no campo; tentativa incrementada. Ao atingir cinco tentativas, desafio é removido e fluxo retorna ao login. |
 | Código expirado | Desafio é removido ou invalidado e o usuário retorna ao login. |
 | Falha no agendador ou e-mail | Depende de log/configuração operacional; alerta automático não está confirmado e deve ser definido. |
-| Logo inválida ou usuário sem papel de proprietário | Upload é rejeitado pela validação ou atualização retorna 403; cores/configurações não são alteradas. |
+| Perfil Dev manipulado por quem não é administrador do sistema | Perfil não é localizado (404) ou a atribuição/alteração é negada (403); nome reservado devolve erro de validação. |
+| Acesso a `/documentation` sem perfil Dev nem administrador do sistema | Acesso negado (403). |
+| Logo inválida ou usuário sem `company.update_branding` | Upload é rejeitado pela validação ou atualização retorna 403; cores/configurações não são alteradas. |
 
 ### 5.6 Identidade visual da empresa
 
@@ -678,6 +751,12 @@ Toda mudança de código deve ser analisada contra esta especificação e atuali
 | Versão | Data | Alteração |
 |---|---|---|
 | 1.0 | 20/11/2026 | Criação da linha de base de produto e arquitetura a partir do código existente; premissas e decisões pendentes explicitadas. |
+| 1.1 | 23/11/2026 | Perfis de acesso e papel administrador na matriz de permissões; modal “Gerenciar” da equipe; dados cadastrais da empresa e configurações em seções; perfil Dev, administrador do sistema (`users.is_system_admin`) e página `/documentation`; ajuste do painel quando não há totais por unidade. |
+| 1.2 | 23/11/2026 | Permissões de gestão da empresa (`team.view`, `team.assign_profiles`, `profiles.manage`, `company.update_branding`; 18 permissões) com regras anti-escalada; perfil “Acesso completo” renomeado para “Administrador”; perfil padrão de convite “Membro” (`is_invite_default`, somente consulta); tela “Meu perfil” com barra de âncoras e lista “Minhas empresas”; ajuda `/help` reescrita para usuários finais, com seção “Para desenvolvedores”; `/documentation` com subtítulo e botão “Guia para usuários”; e-mails de login e convite com a marca da empresa; testes novos em `ProfileTest`, `CompanyInviteProfileTest` e `CompanyManagementPermissionsTest`. |
+
+**Operação da revisão 1.2:** nenhuma migration nova além das listadas abaixo (introduzidas no ciclo 1.1/1.2); para exibir a logo nos e-mails, o link `php artisan storage:link` precisa estar ativo, pois a logo é servida pelo disco público.
+
+**Operação das migrations:** após atualizar o código, executar `php artisan migrate` (migrations de dados cadastrais da empresa, de `is_system_admin`, da renomeação do perfil “Acesso completo” para “Administrador”, das permissões de gestão, que entram desativadas em todos os perfis existentes, e do perfil de convite “Membro”, criado em cada empresa sem alterar perfis nem membros existentes; se já houver um perfil “Membro”, o novo recebe o nome “Membro (convite)”). Para designar um administrador do sistema, atualizar `users.is_system_admin` diretamente no banco.
 
 **Responsável de aprovação:** **A confirmar** (produto/negócio e responsável técnico).  
 **Próxima revisão recomendada:** após validar escopo, ambiente de implantação, KPIs e resultados do primeiro ciclo de homologação.

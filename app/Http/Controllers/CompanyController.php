@@ -23,15 +23,15 @@ class CompanyController extends Controller
         }
 
         $membership = $company->membershipFor($request->user());
-        $isOwner = $membership?->pivot->role === Company::ROLE_OWNER;
-        $canManagePermissions = $company->isPermissionManager($membership);
+        $isOwner = $company->isOwner($membership);
         $permissions = CompanyPermissionProfile::GROUPS;
         $access = $company->permissionsFor($membership);
+        $canViewTeam = $access['team.view'] ?? false;
+        $canManageProfiles = $access['profiles.manage'] ?? false;
+        $canAssignProfiles = $access['team.assign_profiles'] ?? false;
+        $canUpdateBranding = $access['company.update_branding'] ?? false;
 
-        abort_unless(
-            $isOwner || $canManagePermissions || $access['units.view'] || $access['suppliers.view'],
-            403,
-        );
+        abort_unless($company->canAccessSettings($membership), 403);
 
         if ($access['units.view']) {
             $company->load([
@@ -45,15 +45,26 @@ class CompanyController extends Controller
             ]);
         }
 
-        if ($canManagePermissions) {
+        if ($canViewTeam) {
+            $company->load('users');
+        }
+
+        if ($canManageProfiles || $canAssignProfiles) {
             $company->load([
-                'users',
                 'permissionProfiles' => fn ($query) => $query
                     ->visibleTo($request->user())
                     ->withCount('members')
                     ->orderBy('name'),
             ]);
         }
+
+        $hiddenProfileIds = $canViewTeam
+            ? $company->permissionProfiles()
+                ->whereNotIn('id', $company->permissionProfiles()->visibleTo($request->user())->select('id'))
+                ->pluck('id')
+                ->all()
+            : [];
+        $visibleProfiles = $company->relationLoaded('permissionProfiles') ? $company->permissionProfiles : collect();
 
         if ($isOwner) {
             $company->load([
@@ -66,9 +77,9 @@ class CompanyController extends Controller
 
         $sections = array_keys(array_filter([
             'company' => true,
-            'branding' => $isOwner,
-            'profiles' => $canManagePermissions,
-            'team' => $isOwner || $canManagePermissions,
+            'branding' => $canUpdateBranding,
+            'profiles' => $canManageProfiles,
+            'team' => $isOwner || $canViewTeam,
             'records' => $access['units.view'] || $access['suppliers.view'],
             'archive' => $isOwner,
         ]));
@@ -76,18 +87,33 @@ class CompanyController extends Controller
         return view('companies.show', [
             'company' => $company,
             'isOwner' => $isOwner,
-            'canManagePermissions' => $canManagePermissions,
+            'canViewTeam' => $canViewTeam,
             'permissions' => $permissions,
             'access' => $access,
             'sections' => $sections,
             'activeSection' => $this->activeSection($request, $sections),
-            'hiddenProfileIds' => $canManagePermissions && ! $request->user()->isSystemAdmin()
-                ? $company->permissionProfiles()
-                    ->whereRaw('lower(trim(name)) = ?', [Company::DEVELOPER_PROFILE_NAME])
-                    ->pluck('id')
-                    ->all()
+            'hiddenProfileIds' => $hiddenProfileIds,
+            'editableProfileIds' => $canManageProfiles
+                ? $visibleProfiles
+                    ->filter(fn (CompanyPermissionProfile $profile): bool => ! $profile->is_default
+                        && $company->canEditProfile($membership, $profile))
+                    ->modelKeys()
                 : [],
-            'memberCount' => $canManagePermissions ? $company->users->count() : null,
+            'assignableProfiles' => $canAssignProfiles
+                ? $visibleProfiles
+                    ->filter(fn (CompanyPermissionProfile $profile): bool => $company->canDelegate(
+                        $membership,
+                        CompanyPermissionProfile::normalize($profile->permissions),
+                    ))
+                    ->values()
+                : collect(),
+            'assignableMemberIds' => $canAssignProfiles && $canViewTeam
+                ? $company->users
+                    ->filter(fn ($member): bool => ! in_array($member->pivot->permission_profile_id, $hiddenProfileIds, true)
+                        && $company->canAssignProfileTo($membership, $member))
+                    ->modelKeys()
+                : [],
+            'memberCount' => $canViewTeam ? $company->users->count() : null,
             'logoUrl' => $company->logo_path === null
                 ? null
                 : Storage::disk('public')->url($company->logo_path),
@@ -185,10 +211,7 @@ class CompanyController extends Controller
         }
 
         abort_unless(
-            $company->users()
-                ->whereKey($request->user()->getKey())
-                ->wherePivot('role', Company::ROLE_OWNER)
-                ->exists(),
+            $company->allows($company->membershipFor($request->user()), 'company.update_branding'),
             403,
         );
 
@@ -251,11 +274,7 @@ class CompanyController extends Controller
 
         $companyId = DB::transaction(function () use ($request, $validated): int {
             $company = Company::create(['name' => $validated['name']]);
-            $profile = $company->permissionProfiles()->create([
-                'name' => 'Acesso completo',
-                'permissions' => CompanyPermissionProfile::allPermissions(),
-                'is_default' => true,
-            ]);
+            $profile = $company->createInitialPermissionProfiles();
             $company->users()->attach($request->user()->getKey(), [
                 'role' => Company::ROLE_OWNER,
                 'permission_profile_id' => $profile->getKey(),
