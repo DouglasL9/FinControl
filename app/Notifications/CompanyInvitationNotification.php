@@ -2,15 +2,20 @@
 
 namespace App\Notifications;
 
+use App\Models\Company;
+use App\Notifications\Concerns\BuildsBrandedMail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class CompanyInvitationNotification extends Notification
 {
+    use BuildsBrandedMail;
+
     public function __construct(
         private readonly string $companyName,
         private readonly string $inviterName,
         private readonly string $acceptUrl,
+        private readonly ?Company $company = null,
     ) {}
 
     /**
@@ -28,11 +33,10 @@ class CompanyInvitationNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $brand = $this->brandViewData($this->company);
+
         return (new MailMessage)
             ->subject("Convite para {$this->companyName}")
-            ->greeting('Você foi convidado!')
-            ->line("{$this->inviterName} convidou você para acompanhar as contas a pagar de {$this->companyName}.")
-            ->action('Aceitar convite', $this->acceptUrl)
-            ->line('O convite expira em 7 dias e só pode ser aceito pelo endereço convidado.');
+            ->markdown('mail.company-invitation', [...$brand, 'companyName' => $this->companyName, 'inviterName' => $this->inviterName, 'acceptUrl' => $this->acceptUrl]);
     }
 }

@@ -6,15 +6,10 @@
     @php($hasCompany = $currentCompany !== null)
     @php($membership = $currentCompany?->membershipFor($user))
     @php($permissions = $currentCompany?->permissionsFor($membership) ?? [])
-    @php($canManagePermissions = $currentCompany?->isPermissionManager($membership) ?? false)
     @php($isDeveloper = $user->isSystemAdmin() || ($currentCompany?->hasDeveloperProfile($membership) ?? false))
     @php($canViewDashboard =! $hasCompany || ($permissions['dashboard.view'] ?? false))
     @php($canViewPayables = $hasCompany && ($permissions['payables.view'] ?? false))
-    @php($canViewCompany = $hasCompany && (
-        $canManagePermissions
-        || ($permissions['units.view'] ?? false)
-        || ($permissions['suppliers.view'] ?? false)
-    ))
+    @php($canViewCompany = $hasCompany && $currentCompany->canAccessSettings($membership))
 
     <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 justify-between">

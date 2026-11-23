@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Company;
-use App\Models\CompanyPermissionProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
@@ -25,7 +24,7 @@ test('authenticated users can read the product documentation from their profile'
         ->get(route('help.index'))
         ->assertOk()
         ->assertSee('Como usar o FinControl')
-        ->assertSee('Cadastrar contratos recorrentes')
+        ->assertSee('Como cadastrar uma conta fixa')
         ->assertSee('confirme a ação')
         ->assertSee('Proprietário');
 });
@@ -109,11 +108,7 @@ test('deleting the last company owner removes its stored logo', function () {
     Storage::fake('public');
     $user = User::factory()->create();
     $company = Company::create(['name' => 'Empresa com logo']);
-    $profile = $company->permissionProfiles()->create([
-        'name' => 'Acesso completo',
-        'permissions' => CompanyPermissionProfile::allPermissions(),
-        'is_default' => true,
-    ]);
+    $profile = $company->createInitialPermissionProfiles();
     $company->users()->attach($user->getKey(), [
         'role' => Company::ROLE_OWNER,
         'permission_profile_id' => $profile->getKey(),
@@ -168,4 +163,67 @@ test('correct password must be provided to delete account', function () {
         ->assertRedirect('/profile');
 
     $this->assertNotNull($user->fresh());
+});
+
+test('profile page lists the companies and access level of the user', function () {
+    $user = User::factory()->create();
+    $company = Company::create(['name' => 'Empresa Listada']);
+    $profile = $company->createInitialPermissionProfiles();
+    $company->users()->attach($user->getKey(), [
+        'role' => Company::ROLE_OWNER,
+        'permission_profile_id' => $profile->getKey(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('profile.edit'))
+        ->assertOk()
+        ->assertSee('Minhas empresas')
+        ->assertSee('Empresa Listada')
+        ->assertSee('Proprietário')
+        ->assertSee('Verificação em duas etapas');
+});
+
+test('help center is organized by tasks and hides technical docs from regular users', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('help.index'))
+        ->assertOk()
+        ->assertSee('Primeiros passos')
+        ->assertSee('Contas a pagar')
+        ->assertSee('Quem pode fazer o quê')
+        ->assertSee('Seu acesso e segurança')
+        ->assertSee('Dúvidas frequentes')
+        ->assertDontSee('Para desenvolvedores');
+});
+
+test('technical documentation link is shown only to system administrators', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_system_admin' => true])->save();
+
+    $this->actingAs($admin)
+        ->get(route('help.index'))
+        ->assertOk()
+        ->assertSee('Para desenvolvedores')
+        ->assertSee(route('documentation.show'), false);
+});
+
+test('technical documentation page loads for system administrators and is forbidden for others', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_system_admin' => true])->save();
+    $company = Company::create(['name' => 'Empresa docs']);
+    $company->users()->attach($admin->getKey(), ['role' => Company::ROLE_OWNER]);
+
+    $this->actingAs($admin)
+        ->get(route('documentation.show'))
+        ->assertOk()
+        ->assertSee('Documentação do sistema')
+        ->assertSee(route('help.index'), false);
+
+    $member = User::factory()->create();
+    $company->users()->attach($member->getKey(), ['role' => Company::ROLE_MEMBER]);
+
+    $this->actingAs($member)
+        ->get(route('documentation.show'))
+        ->assertForbidden();
 });

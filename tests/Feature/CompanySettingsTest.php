@@ -1,17 +1,12 @@
 <?php
 
 use App\Models\Company;
-use App\Models\CompanyPermissionProfile;
 use App\Models\User;
 
 function createCompanyForSettingsTest(User $owner, string $name = 'Empresa configurada'): Company
 {
     $company = Company::create(['name' => $name]);
-    $profile = $company->permissionProfiles()->create([
-        'name' => 'Acesso completo',
-        'permissions' => CompanyPermissionProfile::allPermissions(),
-        'is_default' => true,
-    ]);
+    $profile = $company->createInitialPermissionProfiles();
     $company->users()->attach($owner->getKey(), [
         'role' => Company::ROLE_OWNER,
         'permission_profile_id' => $profile->getKey(),

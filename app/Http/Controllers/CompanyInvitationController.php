@@ -84,6 +84,7 @@ class CompanyInvitationController extends Controller
                 $company->name,
                 $request->user()->name,
                 route('company-invitations.show', ['token' => $token]),
+                $company,
             ),
         );
 
@@ -121,13 +122,14 @@ class CompanyInvitationController extends Controller
                 abort(403, 'You already belong to this company.');
             }
 
-            $defaultProfile = $company->permissionProfiles()
-                ->where('is_default', true)
-                ->firstOrFail();
+            $inviteProfileId = $company->permissionProfiles()
+                ->where('is_invite_default', true)
+                ->where('is_default', false)
+                ->value('id');
 
             $invitation->company->users()->attach($request->user()->getKey(), [
                 'role' => Company::ROLE_MEMBER,
-                'permission_profile_id' => $defaultProfile->getKey(),
+                'permission_profile_id' => $inviteProfileId,
             ]);
             $invitation->forceFill(['accepted_at' => now()])->save();
             $request->session()->put('active_company_id', $invitation->company->getKey());

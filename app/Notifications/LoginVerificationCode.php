@@ -2,12 +2,19 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
+use App\Notifications\Concerns\BuildsBrandedMail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class LoginVerificationCode extends Notification
 {
-    public function __construct(public readonly string $code) {}
+    use BuildsBrandedMail;
+
+    public function __construct(
+        public readonly string $code,
+        private readonly ?User $user = null,
+    ) {}
 
     /**
      * Get the notification's delivery channels.
@@ -24,10 +31,15 @@ class LoginVerificationCode extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $brand = $this->brandViewData($this->singleActiveCompanyOf($this->user));
+        $firstName = $this->firstNameOf($this->user?->name);
+
         return (new MailMessage)
             ->subject(__('Your sign-in verification code'))
-            ->line(__('Use this code to finish signing in:'))
-            ->line($this->code)
-            ->line(__('This code expires in 10 minutes. If you did not try to sign in, you can ignore this email.'));
+            ->markdown('mail.login-code', [
+                ...$brand,
+                'code' => $this->code,
+                'greeting' => $firstName === null ? 'Olá!' : "Olá, {$firstName}!",
+            ]);
     }
 }

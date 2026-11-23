@@ -7,11 +7,7 @@ use App\Models\User;
 function createCompanyForAccessTest(User $owner, string $name = 'Empresa de acesso'): Company
 {
     $company = Company::create(['name' => $name]);
-    $defaultProfile = $company->permissionProfiles()->create([
-        'name' => 'Acesso completo',
-        'permissions' => CompanyPermissionProfile::allPermissions(),
-        'is_default' => true,
-    ]);
+    $defaultProfile = $company->createInitialPermissionProfiles();
 
     $company->users()->attach($owner->getKey(), [
         'role' => Company::ROLE_OWNER,
@@ -224,4 +220,51 @@ test('permission profiles reject unknown actions and protect the default profile
 
     expect($defaultProfile->fresh()->is_default)->toBeTrue()
         ->and($defaultProfile->fresh()->permissions['payables.view'])->toBeTrue();
+});
+
+test('administrator profile is hidden from and cannot be assigned by users who do not hold it', function () {
+    $owner = User::factory()->create();
+    $company = createCompanyForAccessTest($owner);
+    $limitedProfile = $company->permissionProfiles()->create([
+        'name' => 'Somente consulta',
+        'permissions' => array_fill_keys(CompanyPermissionProfile::permissionKeys(), false),
+    ]);
+    $administratorProfileId = $company->permissionProfiles()->where('is_default', true)->value('id');
+    $manager = User::factory()->create();
+    $company->users()->attach($manager->getKey(), [
+        'role' => Company::ROLE_ADMIN,
+        'permission_profile_id' => $limitedProfile->getKey(),
+    ]);
+    $target = User::factory()->create();
+    $company->users()->attach($target->getKey(), [
+        'role' => Company::ROLE_MEMBER,
+        'permission_profile_id' => $limitedProfile->getKey(),
+    ]);
+    $fullAccessMember = User::factory()->create();
+    addMemberForAccessTest($company, $fullAccessMember);
+
+    $this->actingAs($manager)
+        ->get(route('company.show'))
+        ->assertOk()
+        ->assertDontSee('Administrador</option>', false);
+
+    $this->actingAs($manager)
+        ->patch(route('company.members.permissions.update', $target), [
+            'permission_profile_id' => $administratorProfileId,
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($manager)
+        ->patch(route('company.members.permissions.update', $fullAccessMember), [
+            'permission_profile_id' => $limitedProfile->getKey(),
+        ])
+        ->assertForbidden();
+
+    expect($target->companies()->first()->pivot->permission_profile_id)->toBe($limitedProfile->getKey());
+
+    $this->actingAs($owner)
+        ->patch(route('company.members.permissions.update', $target), [
+            'permission_profile_id' => $administratorProfileId,
+        ])
+        ->assertRedirect(route('company.show'));
 });

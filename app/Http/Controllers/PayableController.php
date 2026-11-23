@@ -81,9 +81,7 @@ class PayableController extends Controller
                 'update_amount' => $access['payables.update_amount'] ?? false,
                 'change_payment_status' => $access['payables.change_payment_status'] ?? false,
                 'manage_contract' => $access['payables.manage_contract'] ?? false,
-                'view_company' => $company->isPermissionManager($membership)
-                    || ($access['units.view'] ?? false)
-                    || ($access['suppliers.view'] ?? false),
+                'view_company' => $company->canAccessSettings($membership),
             ],
             'contracts' => $contracts,
             'summary' => $summary->forCompany($company),

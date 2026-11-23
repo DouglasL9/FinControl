@@ -26,10 +26,11 @@
                 <div class="max-w-2xl">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">Perfil Dev</p>
                     <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Documentação do sistema</h1>
-                    <p class="mt-2 text-sm leading-6 text-white/80 sm:text-base">Especificação funcional, técnica e operacional do FinControl.</p>
+                    <p class="mt-2 text-sm leading-6 text-white/80 sm:text-base">Conteúdo de referência para a equipe técnica. Para o passo a passo de uso, consulte o guia para usuários.</p>
                 </div>
                 <div class="flex flex-wrap gap-2 text-xs font-medium text-white/90">
                     <span class="rounded-full border border-white/20 bg-white/10 px-3 py-1.5">{{ count($tableOfContents) }} seções</span>
+                    <a href="{{ route('help.index') }}" class="rounded-full border border-white/20 bg-white/20 px-3 py-1.5 font-semibold hover:bg-white/30">Guia para usuários →</a>
                     <span class="rounded-full border border-white/20 bg-white/10 px-3 py-1.5">Atualizada em {{ $updatedAt->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</span>
                 </div>
             </div>
