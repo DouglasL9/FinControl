@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\User;
 use App\Models\Company;
 use App\Models\CompanyPermissionProfile;
+use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
 test('profile page is displayed', function () {
@@ -142,9 +142,10 @@ test('profile update notifications are displayed on the profile page', function 
         ->assertSee('Perfil atualizado com sucesso.');
 });
 
-test('account deletion notifications are displayed on the welcome page', function () {
+test('account deletion notifications are displayed on the login page', function () {
     $response = $this
         ->withSession(['status' => 'account-deleted'])
+        ->followingRedirects()
         ->get('/');
 
     $response
