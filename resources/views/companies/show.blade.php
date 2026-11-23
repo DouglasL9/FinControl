@@ -1,0 +1,801 @@
+<x-app-layout>
+    <div class="mx-auto max-w-screen-xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <header class="relative isolate overflow-hidden rounded-[2rem] bg-brand-gradient px-6 py-7 text-white shadow-xl shadow-slate-900/10 sm:px-8 sm:py-9">
+            <div class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true"></div>
+            <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">Espaço da empresa</p>
+                    <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{{ $company->name }}</h1>
+                    <p class="mt-2 text-sm leading-6 text-white/80 sm:text-base">Acompanhe as informações e os acessos disponíveis para sua empresa.</p>
+                    <div class="mt-5 flex flex-wrap gap-2">
+                        @if ($access['units.view'])
+                            <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">{{ $company->units->count() }} unidades</span>
+                        @endif
+                        @if ($access['suppliers.view'])
+                            <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">{{ $company->suppliers->count() }} fornecedores</span>
+                        @endif
+                        @if ($canManagePermissions)
+                            <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">{{ $memberCount }} membros</span>
+                        @endif
+                    </div>
+                </div>
+                <span class="flex h-16 w-16 shrink-0 items-center justify-center self-start rounded-2xl border border-white/15 bg-white/10 p-2 sm:self-center">
+                    @if ($logoUrl)
+                        <img src="{{ $logoUrl }}" alt="Logo de {{ $company->name }}" class="h-full w-full object-contain">
+                    @else
+                        <svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01" stroke-width="2.2" stroke-linecap="round" />
+                        </svg>
+                    @endif
+                </span>
+            </div>
+        </header>
+
+        @if ($isOwner)
+            <section class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+                <div class="mb-5">
+                    <h2 class="font-semibold text-slate-900">Identidade visual</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">Personalize as cores, a logo e a marca d’água compartilhadas com a equipe desta empresa.</p>
+                </div>
+
+                <form
+                    method="POST"
+                    action="{{ route('company.branding.update') }}"
+                    enctype="multipart/form-data"
+                    class="grid gap-6 lg:grid-cols-2"
+                    x-data="{ primaryColor: '{{ $company->primary_color }}', accentColor: '{{ $company->accent_color }}', watermarkOpacity: {{ $company->watermark_opacity }} }"
+                >
+                    @csrf
+                    @method('PATCH')
+
+                    <div class="space-y-5">
+                        <div>
+                            <x-input-label for="primary_color" value="Cor principal" />
+                            <div class="mt-1 flex items-center gap-3">
+                                <input id="primary_color" name="primary_color" type="color" value="{{ $company->primary_color }}" x-model="primaryColor" class="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1">
+                                <span class="text-sm font-medium text-slate-600" x-text="primaryColor"></span>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-500">Prefira tons escuros para manter o contraste dos textos nos elementos coloridos.</p>
+                            <x-input-error :messages="$errors->get('primary_color')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="accent_color" value="Cor de destaque" />
+                            <div class="mt-1 flex items-center gap-3">
+                                <input id="accent_color" name="accent_color" type="color" value="{{ $company->accent_color }}" x-model="accentColor" class="h-11 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1">
+                                <span class="text-sm font-medium text-slate-600" x-text="accentColor"></span>
+                            </div>
+                            <x-input-error :messages="$errors->get('accent_color')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between gap-3">
+                                <x-input-label for="watermark_opacity" value="Opacidade da marca d’água" />
+                                <span class="text-sm font-semibold text-slate-700"><span x-text="watermarkOpacity"></span>%</span>
+                            </div>
+                            <input id="watermark_opacity" name="watermark_opacity" type="range" min="0" max="30" step="1" value="{{ $company->watermark_opacity }}" x-model.number="watermarkOpacity" class="mt-3 w-full accent-brand-primary">
+                            <p class="mt-1 text-xs text-slate-500">A marca d’água usa a logo; 0% a oculta.</p>
+                            <x-input-error :messages="$errors->get('watermark_opacity')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="company_logo" value="Logo da empresa" />
+                            <input id="company_logo" name="logo" type="file" accept=".jpg,.jpeg,.png,.webp" class="mt-1 block w-full rounded-xl border border-slate-300 bg-white text-sm text-slate-700 file:mr-4 file:border-0 file:bg-brand-muted file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-brand-primary">
+                            <p class="mt-1 text-xs text-slate-500">PNG, JPG ou WebP; até 2 MB. SVG não é aceito.</p>
+                            <x-input-error :messages="$errors->get('logo')" class="mt-2" />
+
+                            @if ($logoUrl)
+                                <label class="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                                    <input type="checkbox" name="remove_logo" value="1" @checked(old('remove_logo')) class="rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
+                                    Remover logo atual
+                                </label>
+                            @endif
+                            <x-input-error :messages="$errors->get('remove_logo')" class="mt-2" />
+                        </div>
+
+                        <div class="flex flex-wrap gap-3">
+                            <x-primary-button>Salvar identidade visual</x-primary-button>
+                            <button
+                                type="button"
+                                @click="primaryColor = '#4f46e5'; accentColor = '#7c3aed'; watermarkOpacity = 6"
+                                class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                            >
+                                Restaurar padrão
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">Prévia</p>
+                        <div class="relative mt-2 flex min-h-52 flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            @if ($logoUrl)
+                                <img src="{{ $logoUrl }}" alt="" class="pointer-events-none absolute inset-0 m-auto h-full w-full object-contain p-8" :style="{ opacity: watermarkOpacity / 100 }">
+                            @else
+                                <span class="pointer-events-none absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-muted text-brand-primary" :style="{ opacity: watermarkOpacity / 100 }" aria-hidden="true">
+                                    <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M4 19V5m0 14h16M8 15v-3m4 3V7m4 8v-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                            @endif
+                            <div class="relative">
+                                <p class="text-sm font-semibold text-slate-800">{{ $company->name }}</p>
+                                <p class="mt-1 text-xs text-slate-500">Prévia das cores no espaço da empresa</p>
+                            </div>
+                            <div class="relative flex flex-wrap items-center gap-3">
+                                <span :style="{ backgroundColor: primaryColor }" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm">Ação principal</span>
+                                <span :style="{ backgroundColor: accentColor }" class="rounded-full px-3 py-1.5 text-xs font-semibold text-white">Destaque</span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        @endif
+
+        <div class="space-y-6">
+            @if ($access['units.view'])
+            <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+                <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div>
+                        <h2 class="font-semibold text-slate-900">Unidades e sedes</h2>
+                        <p class="mt-1 text-sm text-slate-500">Mantenha endereço e contato atualizados. Unidades arquivadas continuam no histórico, mas não podem receber novos contratos.</p>
+                    </div>
+                    @if ($access['units.create'])
+                        <x-primary-button type="button" x-data="{}" x-on:click="$dispatch('open-modal', 'create-unit')">
+                            Adicionar unidade
+                        </x-primary-button>
+                    @endif
+                </div>
+                @if ($company->units->isEmpty())
+                    <p class="px-5 py-4 text-sm text-slate-500 sm:px-6">Nenhuma unidade cadastrada.</p>
+                @else
+                    <ul class="divide-y divide-slate-100">
+                        @foreach ($company->units as $unit)
+                            <li class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                                <span class="min-w-0">
+                                    <span class="block truncate text-sm font-semibold text-slate-800">{{ $unit->name }}</span>
+                                    <span class="mt-1 block text-xs text-slate-500">
+                                        {{ collect([
+                                            $unit->street,
+                                            $unit->number,
+                                            $unit->complement,
+                                            $unit->neighborhood,
+                                            $unit->city,
+                                            $unit->state,
+                                            $unit->postal_code ? 'CEP '.$unit->postal_code : null,
+                                            $unit->phone,
+                                        ])->filter()->implode(' · ') ?: 'Endereço e contato não informados' }}
+                                    </span>
+                                </span>
+                                <span class="flex flex-wrap items-center gap-3">
+                                    @if ($unit->is_active)
+                                        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ativa</span>
+                                    @else
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Arquivada</span>
+                                    @endif
+                                    @if ($access['units.update'])
+                                        <button
+                                            type="button"
+                                            x-data="{}"
+                                            x-on:click="$dispatch('open-modal', 'edit-unit-{{ $unit->id }}')"
+                                            class="text-sm font-semibold text-brand-primary hover:brightness-90"
+                                        >
+                                            Editar
+                                        </button>
+                                    @endif
+                                    @if ($access['units.archive'])
+                                        <form method="POST" action="{{ route('company.units.toggle', $unit) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="text-sm font-semibold {{ $unit->is_active ? 'text-rose-700 hover:text-rose-800' : 'text-emerald-700 hover:text-emerald-800' }}">
+                                                {{ $unit->is_active ? 'Arquivar' : 'Reativar' }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
+            @endif
+        </div>
+
+        @if ($access['units.create'])
+        @php($createUnitIsOpen = old('_modal') === 'create-unit')
+        @php($createUnitErrors = $createUnitIsOpen ? $errors->getBag('default') : new \Illuminate\Support\MessageBag())
+        <x-modal name="create-unit" :show="$createUnitIsOpen" maxWidth="2xl" focusable>
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Adicionar unidade</h2>
+                    <p class="mt-1 text-sm text-slate-500">Informe os dados da sede ou filial.</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close-modal', 'create-unit')" class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('company.units.store') }}" class="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-3" x-data="unitAddressLookup">
+                @csrf
+                <input type="hidden" name="_modal" value="create-unit">
+                <div>
+                    <x-input-label for="unit_name" value="Nome da unidade" />
+                    <x-text-input id="unit_name" name="unit_name" class="mt-1" :value="$createUnitIsOpen ? old('unit_name') : ''" required maxlength="255" placeholder="Ex.: Filial Campinas" />
+                    <x-input-error :messages="$createUnitErrors->get('unit_name')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="unit_postal_code" value="CEP" />
+                    <x-text-input id="unit_postal_code" name="postal_code" x-ref="postalCode" x-on:input.debounce.500ms="lookupCep" class="mt-1" :value="$createUnitIsOpen ? old('postal_code') : ''" inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code" />
+                    <x-input-error :messages="$createUnitErrors->get('postal_code')" class="mt-2" />
+                    <p x-cloak x-show="lookupMessage" x-text="lookupMessage" x-bind:class="{ 'text-slate-500': lookupState === 'loading', 'text-emerald-700': lookupState === 'success', 'text-rose-600': lookupState === 'error' }" class="mt-1 text-xs" role="status" aria-live="polite"></p>
+                </div>
+                <div>
+                    <x-input-label for="unit_street" value="Rua / avenida" />
+                    <x-text-input id="unit_street" name="street" x-ref="street" class="mt-1" :value="$createUnitIsOpen ? old('street') : ''" maxlength="255" />
+                    <x-input-error :messages="$createUnitErrors->get('street')" class="mt-2" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <x-input-label for="unit_number" value="Número" />
+                        <x-text-input id="unit_number" name="number" class="mt-1" :value="$createUnitIsOpen ? old('number') : ''" maxlength="32" />
+                        <x-input-error :messages="$createUnitErrors->get('number')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="unit_complement" value="Complemento" />
+                        <x-text-input id="unit_complement" name="complement" class="mt-1" :value="$createUnitIsOpen ? old('complement') : ''" maxlength="255" />
+                        <x-input-error :messages="$createUnitErrors->get('complement')" class="mt-2" />
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="unit_neighborhood" value="Bairro" />
+                    <x-text-input id="unit_neighborhood" name="neighborhood" x-ref="neighborhood" class="mt-1" :value="$createUnitIsOpen ? old('neighborhood') : ''" maxlength="255" />
+                    <x-input-error :messages="$createUnitErrors->get('neighborhood')" class="mt-2" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <x-input-label for="unit_city" value="Cidade" />
+                        <x-text-input id="unit_city" name="city" x-ref="city" class="mt-1" :value="$createUnitIsOpen ? old('city') : ''" maxlength="255" />
+                        <x-input-error :messages="$createUnitErrors->get('city')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="unit_state" value="UF" />
+                        <x-text-input id="unit_state" name="state" x-ref="state" class="mt-1 uppercase" :value="$createUnitIsOpen ? old('state') : ''" maxlength="2" placeholder="SP" />
+                        <x-input-error :messages="$createUnitErrors->get('state')" class="mt-2" />
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="unit_phone" value="Telefone" />
+                    <x-text-input id="unit_phone" name="phone" type="tel" class="mt-1" :value="$createUnitIsOpen ? old('phone') : ''" maxlength="32" />
+                    <x-input-error :messages="$createUnitErrors->get('phone')" class="mt-2" />
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 sm:col-span-2 xl:col-span-3">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'create-unit')">Cancelar</x-secondary-button>
+                    <x-primary-button>Adicionar unidade</x-primary-button>
+                </div>
+            </form>
+        </x-modal>
+        @endif
+
+        @if ($access['units.update'])
+        @foreach ($company->units as $unit)
+            @php($editUnitModal = 'edit-unit-'.$unit->id)
+            @php($editUnitIsOpen = old('_modal') === $editUnitModal)
+            @php($editUnitErrors = $editUnitIsOpen ? $errors->getBag('default') : new \Illuminate\Support\MessageBag())
+            <x-modal :name="$editUnitModal" :show="$editUnitIsOpen" maxWidth="2xl" focusable>
+                <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Editar unidade</h2>
+                        <p class="mt-1 text-sm text-slate-500">{{ $unit->name }}</p>
+                    </div>
+                    <button type="button" x-on:click="$dispatch('close-modal', '{{ $editUnitModal }}')" class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form method="POST" action="{{ route('company.units.update', $unit) }}" class="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-3" x-data="unitAddressLookup">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="_modal" value="{{ $editUnitModal }}">
+                    <div>
+                        <x-input-label for="edit_unit_name_{{ $unit->id }}" value="Nome da unidade" />
+                        <x-text-input id="edit_unit_name_{{ $unit->id }}" name="unit_name" class="mt-1" :value="$editUnitIsOpen ? old('unit_name', $unit->name) : $unit->name" required maxlength="255" />
+                        <x-input-error :messages="$editUnitErrors->get('unit_name')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_unit_postal_code_{{ $unit->id }}" value="CEP" />
+                        <x-text-input id="edit_unit_postal_code_{{ $unit->id }}" name="postal_code" x-ref="postalCode" x-on:input.debounce.500ms="lookupCep" class="mt-1" :value="$editUnitIsOpen ? old('postal_code', $unit->postal_code) : $unit->postal_code" inputmode="numeric" maxlength="9" placeholder="00000-000" autocomplete="postal-code" />
+                        <x-input-error :messages="$editUnitErrors->get('postal_code')" class="mt-2" />
+                        <p x-cloak x-show="lookupMessage" x-text="lookupMessage" x-bind:class="{ 'text-slate-500': lookupState === 'loading', 'text-emerald-700': lookupState === 'success', 'text-rose-600': lookupState === 'error' }" class="mt-1 text-xs" role="status" aria-live="polite"></p>
+                    </div>
+                    <div>
+                        <x-input-label for="edit_unit_street_{{ $unit->id }}" value="Rua / avenida" />
+                        <x-text-input id="edit_unit_street_{{ $unit->id }}" name="street" x-ref="street" class="mt-1" :value="$editUnitIsOpen ? old('street', $unit->street) : $unit->street" maxlength="255" />
+                        <x-input-error :messages="$editUnitErrors->get('street')" class="mt-2" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <x-input-label for="edit_unit_number_{{ $unit->id }}" value="Número" />
+                            <x-text-input id="edit_unit_number_{{ $unit->id }}" name="number" class="mt-1" :value="$editUnitIsOpen ? old('number', $unit->number) : $unit->number" maxlength="32" />
+                            <x-input-error :messages="$editUnitErrors->get('number')" class="mt-2" />
+                        </div>
+                        <div>
+                            <x-input-label for="edit_unit_complement_{{ $unit->id }}" value="Complemento" />
+                            <x-text-input id="edit_unit_complement_{{ $unit->id }}" name="complement" class="mt-1" :value="$editUnitIsOpen ? old('complement', $unit->complement) : $unit->complement" maxlength="255" />
+                            <x-input-error :messages="$editUnitErrors->get('complement')" class="mt-2" />
+                        </div>
+                    </div>
+                    <div>
+                        <x-input-label for="edit_unit_neighborhood_{{ $unit->id }}" value="Bairro" />
+                        <x-text-input id="edit_unit_neighborhood_{{ $unit->id }}" name="neighborhood" x-ref="neighborhood" class="mt-1" :value="$editUnitIsOpen ? old('neighborhood', $unit->neighborhood) : $unit->neighborhood" maxlength="255" />
+                        <x-input-error :messages="$editUnitErrors->get('neighborhood')" class="mt-2" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <x-input-label for="edit_unit_city_{{ $unit->id }}" value="Cidade" />
+                            <x-text-input id="edit_unit_city_{{ $unit->id }}" name="city" x-ref="city" class="mt-1" :value="$editUnitIsOpen ? old('city', $unit->city) : $unit->city" maxlength="255" />
+                            <x-input-error :messages="$editUnitErrors->get('city')" class="mt-2" />
+                        </div>
+                        <div>
+                            <x-input-label for="edit_unit_state_{{ $unit->id }}" value="UF" />
+                            <x-text-input id="edit_unit_state_{{ $unit->id }}" name="state" x-ref="state" class="mt-1 uppercase" :value="$editUnitIsOpen ? old('state', $unit->state) : $unit->state" maxlength="2" placeholder="SP" />
+                            <x-input-error :messages="$editUnitErrors->get('state')" class="mt-2" />
+                        </div>
+                    </div>
+                    <div>
+                        <x-input-label for="edit_unit_phone_{{ $unit->id }}" value="Telefone" />
+                        <x-text-input id="edit_unit_phone_{{ $unit->id }}" name="phone" type="tel" class="mt-1" :value="$editUnitIsOpen ? old('phone', $unit->phone) : $unit->phone" maxlength="32" />
+                        <x-input-error :messages="$editUnitErrors->get('phone')" class="mt-2" />
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 sm:col-span-2 xl:col-span-3">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close-modal', '{{ $editUnitModal }}')">Cancelar</x-secondary-button>
+                        <x-primary-button>Salvar alterações</x-primary-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endforeach
+        @endif
+
+        @if ($access['suppliers.view'])
+        <section id="suppliers" class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+            <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                    <h2 class="font-semibold text-slate-900">Fornecedores</h2>
+                    <p class="mt-1 text-sm text-slate-500">Cadastre os dados uma vez e selecione o fornecedor ao criar cada contrato. Arquivar preserva os contratos e o histórico.</p>
+                </div>
+                @if ($access['suppliers.create'])
+                    <x-primary-button type="button" x-data="{}" x-on:click="$dispatch('open-modal', 'create-supplier')">
+                        Cadastrar fornecedor
+                    </x-primary-button>
+                @endif
+            </div>
+            @if ($company->suppliers->isEmpty())
+                <p class="px-5 py-4 text-sm text-slate-500 sm:px-6">Nenhum fornecedor cadastrado.</p>
+            @else
+                <ul class="divide-y divide-slate-100">
+                    @foreach ($company->suppliers as $supplier)
+                        <li class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-semibold text-slate-800">{{ $supplier->name }}</span>
+                                <span class="mt-1 block text-xs text-slate-500">
+                                    {{ collect([
+                                        $supplier->formattedCnpj(),
+                                        $supplier->contact_name,
+                                        $supplier->email,
+                                        $supplier->phone,
+                                        $supplier->address,
+                                    ])->filter()->implode(' · ') ?: 'Sem CNPJ ou contato informado' }}
+                                </span>
+                            </span>
+                            <span class="flex flex-wrap items-center gap-3">
+                                @if ($supplier->is_active)
+                                    <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ativo</span>
+                                @else
+                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Arquivado</span>
+                                @endif
+                                @if ($access['suppliers.update'])
+                                    <button
+                                        type="button"
+                                        x-data="{}"
+                                        x-on:click="$dispatch('open-modal', 'edit-supplier-{{ $supplier->id }}')"
+                                        class="text-sm font-semibold text-brand-primary hover:brightness-90"
+                                    >
+                                        Editar
+                                    </button>
+                                @endif
+                                @if ($access['suppliers.archive'])
+                                    <form method="POST" action="{{ route('company.suppliers.toggle', $supplier) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="text-sm font-semibold {{ $supplier->is_active ? 'text-rose-700 hover:text-rose-800' : 'text-emerald-700 hover:text-emerald-800' }}">
+                                            {{ $supplier->is_active ? 'Arquivar' : 'Reativar' }}
+                                        </button>
+                                    </form>
+                                @endif
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
+        @endif
+
+        @if ($access['suppliers.create'])
+        @php($createSupplierIsOpen = old('_modal') === 'create-supplier')
+        @php($createSupplierErrors = $createSupplierIsOpen ? $errors->getBag('default') : new \Illuminate\Support\MessageBag())
+        <x-modal name="create-supplier" :show="$createSupplierIsOpen" maxWidth="2xl" focusable>
+            <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Cadastrar fornecedor</h2>
+                    <p class="mt-1 text-sm text-slate-500">Informe os dados para reutilizar o fornecedor nos contratos da empresa.</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close-modal', 'create-supplier')" class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('company.suppliers.store') }}" class="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+                @csrf
+                <input type="hidden" name="_modal" value="create-supplier">
+                <div>
+                    <x-input-label for="supplier_name" value="Nome do fornecedor" />
+                    <x-text-input id="supplier_name" name="name" class="mt-1" :value="$createSupplierIsOpen ? old('name') : ''" required maxlength="255" placeholder="Ex.: Provedor de internet" />
+                    <x-input-error :messages="$createSupplierErrors->get('name')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="supplier_cnpj" value="CNPJ (opcional)" />
+                    <x-text-input id="supplier_cnpj" name="cnpj" class="mt-1" :value="$createSupplierIsOpen ? old('cnpj') : ''" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" />
+                    <x-input-error :messages="$createSupplierErrors->get('cnpj')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="supplier_contact_name" value="Pessoa de contato" />
+                    <x-text-input id="supplier_contact_name" name="contact_name" class="mt-1" :value="$createSupplierIsOpen ? old('contact_name') : ''" maxlength="255" />
+                    <x-input-error :messages="$createSupplierErrors->get('contact_name')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="supplier_email" value="E-mail" />
+                    <x-text-input id="supplier_email" name="email" type="email" class="mt-1" :value="$createSupplierIsOpen ? old('email') : ''" maxlength="255" />
+                    <x-input-error :messages="$createSupplierErrors->get('email')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="supplier_phone" value="Telefone" />
+                    <x-text-input id="supplier_phone" name="phone" type="tel" class="mt-1" :value="$createSupplierIsOpen ? old('phone') : ''" maxlength="32" />
+                    <x-input-error :messages="$createSupplierErrors->get('phone')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="supplier_address" value="Endereço" />
+                    <x-text-input id="supplier_address" name="address" class="mt-1" :value="$createSupplierIsOpen ? old('address') : ''" maxlength="1000" />
+                    <x-input-error :messages="$createSupplierErrors->get('address')" class="mt-2" />
+                </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <x-input-label for="supplier_notes" value="Observações" />
+                    <textarea id="supplier_notes" name="notes" rows="2" maxlength="1000" class="mt-1 block w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-primary focus:ring-brand-primary">{{ $createSupplierIsOpen ? old('notes') : '' }}</textarea>
+                    <x-input-error :messages="$createSupplierErrors->get('notes')" class="mt-2" />
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 sm:col-span-2 lg:col-span-3">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'create-supplier')">Cancelar</x-secondary-button>
+                    <x-primary-button>Cadastrar fornecedor</x-primary-button>
+                </div>
+            </form>
+        </x-modal>
+        @endif
+
+        @if ($access['suppliers.update'])
+        @foreach ($company->suppliers as $supplier)
+            @php($editSupplierModal = 'edit-supplier-'.$supplier->id)
+            @php($editSupplierIsOpen = old('_modal') === $editSupplierModal)
+            @php($editSupplierErrors = $editSupplierIsOpen ? $errors->getBag('default') : new \Illuminate\Support\MessageBag())
+            <x-modal :name="$editSupplierModal" :show="$editSupplierIsOpen" maxWidth="2xl" focusable>
+                <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Editar fornecedor</h2>
+                        <p class="mt-1 text-sm text-slate-500">{{ $supplier->name }}</p>
+                    </div>
+                    <button type="button" x-on:click="$dispatch('close-modal', '{{ $editSupplierModal }}')" class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form method="POST" action="{{ route('company.suppliers.update', $supplier) }}" class="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="_modal" value="{{ $editSupplierModal }}">
+                    <div>
+                        <x-input-label for="edit_supplier_name_{{ $supplier->id }}" value="Nome do fornecedor" />
+                        <x-text-input id="edit_supplier_name_{{ $supplier->id }}" name="name" class="mt-1" :value="$editSupplierIsOpen ? old('name', $supplier->name) : $supplier->name" required maxlength="255" />
+                        <x-input-error :messages="$editSupplierErrors->get('name')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_supplier_cnpj_{{ $supplier->id }}" value="CNPJ" />
+                        <x-text-input id="edit_supplier_cnpj_{{ $supplier->id }}" name="cnpj" class="mt-1" :value="$editSupplierIsOpen ? old('cnpj', $supplier->cnpj) : $supplier->cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" />
+                        <x-input-error :messages="$editSupplierErrors->get('cnpj')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_supplier_contact_name_{{ $supplier->id }}" value="Pessoa de contato" />
+                        <x-text-input id="edit_supplier_contact_name_{{ $supplier->id }}" name="contact_name" class="mt-1" :value="$editSupplierIsOpen ? old('contact_name', $supplier->contact_name) : $supplier->contact_name" maxlength="255" />
+                        <x-input-error :messages="$editSupplierErrors->get('contact_name')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_supplier_email_{{ $supplier->id }}" value="E-mail" />
+                        <x-text-input id="edit_supplier_email_{{ $supplier->id }}" name="email" type="email" class="mt-1" :value="$editSupplierIsOpen ? old('email', $supplier->email) : $supplier->email" maxlength="255" />
+                        <x-input-error :messages="$editSupplierErrors->get('email')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_supplier_phone_{{ $supplier->id }}" value="Telefone" />
+                        <x-text-input id="edit_supplier_phone_{{ $supplier->id }}" name="phone" type="tel" class="mt-1" :value="$editSupplierIsOpen ? old('phone', $supplier->phone) : $supplier->phone" maxlength="32" />
+                        <x-input-error :messages="$editSupplierErrors->get('phone')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="edit_supplier_address_{{ $supplier->id }}" value="Endereço" />
+                        <x-text-input id="edit_supplier_address_{{ $supplier->id }}" name="address" class="mt-1" :value="$editSupplierIsOpen ? old('address', $supplier->address) : $supplier->address" maxlength="1000" />
+                        <x-input-error :messages="$editSupplierErrors->get('address')" class="mt-2" />
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <x-input-label for="edit_supplier_notes_{{ $supplier->id }}" value="Observações" />
+                        <textarea id="edit_supplier_notes_{{ $supplier->id }}" name="notes" rows="2" maxlength="1000" class="mt-1 block w-full rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-primary focus:ring-brand-primary">{{ $editSupplierIsOpen ? old('notes', $supplier->notes) : $supplier->notes }}</textarea>
+                        <x-input-error :messages="$editSupplierErrors->get('notes')" class="mt-2" />
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-3 sm:col-span-2 lg:col-span-3">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close-modal', '{{ $editSupplierModal }}')">Cancelar</x-secondary-button>
+                        <x-primary-button>Salvar alterações</x-primary-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endforeach
+        @endif
+
+        <div class="grid gap-6 xl:grid-cols-2">
+            @if ($isOwner)
+                <section class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+                    <h2 class="font-semibold text-slate-900">Convidar alguém para a equipe</h2>
+                    <p class="mt-1 text-sm text-slate-500">Busque alguém cadastrado ou informe um e-mail para enviar o convite. Ele expira em 7 dias.</p>
+
+                    <form
+                        x-data="companyUserPicker('{{ route('company-invitations.users.search') }}')"
+                        method="POST"
+                        action="{{ route('company-invitations.store') }}"
+                        class="mt-5 flex flex-col gap-4"
+                    >
+                        @csrf
+                        <div class="w-full max-w-md">
+                            <x-input-label for="invite_user_search" value="Buscar usuário cadastrado" />
+                            <x-text-input
+                                id="invite_user_search"
+                                type="search"
+                                x-model="query"
+                                @input.debounce.300ms="searchUsers"
+                                class="mt-1"
+                                placeholder="Nome ou e-mail (mínimo 2 caracteres)"
+                                autocomplete="off"
+                            />
+                            <p x-show="loading" class="mt-2 text-sm text-slate-500" role="status">Buscando usuários...</p>
+                            <p x-show="error" x-text="error" class="mt-2 text-sm text-rose-600" role="alert"></p>
+                            <ul x-show="results.length > 0" class="mt-2 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                <template x-for="user in results" :key="user.id">
+                                    <li>
+                                        <button
+                                            type="button"
+                                            @click="selectUser(user)"
+                                            class="flex w-full flex-col px-3 py-2 text-left transition hover:bg-brand-muted focus:bg-brand-muted focus:outline-none"
+                                        >
+                                            <span class="text-sm font-medium text-slate-800" x-text="user.name"></span>
+                                            <span class="text-xs text-slate-500" x-text="user.email"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ul>
+                            <p
+                                x-show="query.trim().length >= 2 && !loading && !error && results.length === 0"
+                                class="mt-2 text-sm text-slate-500"
+                            >
+                                Nenhum usuário disponível encontrado.
+                            </p>
+                            <p x-show="selectedNotice" x-text="selectedNotice" class="mt-2 text-sm text-emerald-700" role="status"></p>
+                        </div>
+                        <div class="w-full max-w-md">
+                            <x-input-label for="invite_email" value="E-mail do membro" />
+                            <x-text-input id="invite_email" name="email" type="email" x-model="email" class="mt-1" required autocomplete="email" />
+                            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                        </div>
+                        <x-primary-button class="w-fit">Enviar convite</x-primary-button>
+                    </form>
+
+                    @if ($company->invitations->isNotEmpty())
+                        <div class="mt-6 border-t border-slate-100 pt-5">
+                            <h3 class="text-sm font-semibold text-slate-800">Convites pendentes</h3>
+                            <ul class="mt-3 max-h-56 divide-y divide-slate-100 overflow-y-auto">
+                                @foreach ($company->invitations as $invitation)
+                                    <li class="flex flex-col gap-1 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                        <span class="font-medium text-slate-700">{{ $invitation->email }}</span>
+                                        <span class="text-slate-500">Expira em {{ $invitation->expires_at->format('d/m/Y') }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                </section>
+            @endif
+
+            @if ($canManagePermissions)
+            <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+                <div class="border-b border-slate-100 px-5 py-5 sm:px-6">
+                    <h2 class="font-semibold text-slate-900">Membros da empresa</h2>
+                    <p class="mt-1 text-sm text-slate-500">{{ $company->users->count() }} pessoa(s) com acesso compartilhado.</p>
+                </div>
+                <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+                    @foreach ($company->users as $member)
+                        <li class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-muted text-sm font-semibold text-brand-primary">
+                                    {{ mb_strtoupper(mb_substr($member->name, 0, 1)) }}
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-slate-800">{{ $member->name }}</p>
+                                    <p class="truncate text-sm text-slate-500">{{ $member->email }}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                                    {{ match ($member->pivot->role) {
+                                        \App\Models\Company::ROLE_OWNER => 'Proprietário',
+                                        \App\Models\Company::ROLE_ADMIN => 'Administrador',
+                                        default => 'Membro',
+                                    } }}
+                                </span>
+                                @if ($member->pivot->role !== \App\Models\Company::ROLE_OWNER && ($isOwner || $member->pivot->role === \App\Models\Company::ROLE_MEMBER))
+                                    <form method="POST" action="{{ route('company.members.permissions.update', $member) }}" class="flex items-center gap-2">
+                                        @csrf
+                                        @method('PATCH')
+                                        <label class="sr-only" for="member_profile_{{ $member->id }}">Perfil de acesso de {{ $member->name }}</label>
+                                        <select id="member_profile_{{ $member->id }}" name="permission_profile_id" class="rounded-lg border-slate-200 py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-brand-primary focus:ring-brand-primary">
+                                            @foreach ($company->permissionProfiles as $profile)
+                                                <option value="{{ $profile->id }}" @selected($member->pivot->permission_profile_id == $profile->id)>{{ $profile->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-secondary-button>Salvar perfil</x-secondary-button>
+                                    </form>
+                                @endif
+                                @if ($isOwner && $member->pivot->role !== \App\Models\Company::ROLE_OWNER)
+                                    <form method="POST" action="{{ route('company.members.role.update', $member) }}" class="flex items-center gap-2">
+                                        @csrf
+                                        @method('PATCH')
+                                        <label class="sr-only" for="member_role_{{ $member->id }}">Papel de {{ $member->name }}</label>
+                                        <select id="member_role_{{ $member->id }}" name="role" class="rounded-lg border-slate-200 py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-brand-primary focus:ring-brand-primary">
+                                            <option value="{{ \App\Models\Company::ROLE_MEMBER }}" @selected($member->pivot->role === \App\Models\Company::ROLE_MEMBER)>Membro</option>
+                                            <option value="{{ \App\Models\Company::ROLE_ADMIN }}" @selected($member->pivot->role === \App\Models\Company::ROLE_ADMIN)>Administrador</option>
+                                        </select>
+                                        <x-secondary-button>Atualizar papel</x-secondary-button>
+                                    </form>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+            @endif
+        </div>
+
+        @if ($canManagePermissions)
+            <section class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+                <div>
+                    <h2 class="font-semibold text-slate-900">Perfis de acesso</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                        Crie perfis reutilizáveis com permissões por ação. O perfil “Acesso completo” mantém o acesso atual dos membros e não pode ser removido. Proprietários e administradores gerenciam perfis; somente o proprietário designa administradores, convida pessoas, altera a identidade visual e arquiva a empresa.
+                    </p>
+                </div>
+
+                <div class="mt-5 grid gap-4 lg:grid-cols-2">
+                    @foreach ($company->permissionProfiles as $profile)
+                        <article class="rounded-2xl border border-slate-200 p-4 sm:p-5">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="font-semibold text-slate-900">{{ $profile->name }}</h3>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        {{ $profile->members_count }} usuário(s) associado(s)
+                                        @if ($profile->is_default) · Perfil padrão @endif
+                                    </p>
+                                </div>
+                            </div>
+
+                            @if ($profile->is_default)
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach ($permissions as $groupPermissions)
+                                        @foreach ($groupPermissions as $key => $label)
+                                            @if ($profile->permissions[$key] ?? false)
+                                                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">{{ $label }}</span>
+                                            @endif
+                                        @endforeach
+                                    @endforeach
+                                </div>
+                            @else
+                                @php($profileFormIsOpen = old('profile_id') == $profile->id)
+                                @php($profileFormPermissions = $profileFormIsOpen ? old('permissions', []) : $profile->permissions)
+                                <form method="POST" action="{{ route('company.permission-profiles.update', $profile) }}" class="mt-4 space-y-4">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="profile_id" value="{{ $profile->id }}">
+                                    <div>
+                                        <x-input-label for="profile_name_{{ $profile->id }}" value="Nome do perfil" />
+                                        <x-text-input id="profile_name_{{ $profile->id }}" name="name" class="mt-1" :value="$profileFormIsOpen ? old('name', $profile->name) : $profile->name" required maxlength="80" />
+                                        <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                                    </div>
+                                    @foreach ($permissions as $group => $groupPermissions)
+                                        <fieldset class="rounded-xl bg-slate-50 p-3">
+                                            <legend class="px-1 text-sm font-semibold text-slate-800">{{ $group }}</legend>
+                                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                @foreach ($groupPermissions as $key => $label)
+                                                    <label class="flex items-start gap-2 text-sm text-slate-600">
+                                                        <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($profileFormPermissions[$key] ?? false) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
+                                                        <span>{{ $label }}</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </fieldset>
+                                    @endforeach
+                                    <x-input-error :messages="$errors->get('permissions')" />
+                                    <div class="flex flex-wrap justify-end gap-3">
+                                        @if ($profile->members_count === 0)
+                                            <button type="submit" form="delete_permission_profile_{{ $profile->id }}" class="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">Excluir perfil</button>
+                                        @endif
+                                        <x-primary-button>Salvar perfil</x-primary-button>
+                                    </div>
+                                </form>
+                                @if ($profile->members_count === 0)
+                                    <form id="delete_permission_profile_{{ $profile->id }}" method="POST" action="{{ route('company.permission-profiles.destroy', $profile) }}" class="hidden">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+                                @endif
+                            @endif
+                        </article>
+                    @endforeach
+                </div>
+
+                <details class="mt-5 rounded-2xl border border-dashed border-slate-300 p-4">
+                    <summary class="cursor-pointer text-sm font-semibold text-brand-primary">Criar novo perfil</summary>
+                    @php($newProfileIsOpen = old('profile_id') === 'new')
+                    @php($newProfilePermissions = $newProfileIsOpen ? old('permissions', []) : [])
+                    <form method="POST" action="{{ route('company.permission-profiles.store') }}" class="mt-4 space-y-4">
+                        @csrf
+                        <input type="hidden" name="profile_id" value="new">
+                        <div class="max-w-md">
+                            <x-input-label for="new_profile_name" value="Nome do perfil" />
+                            <x-text-input id="new_profile_name" name="name" class="mt-1" :value="$newProfileIsOpen ? old('name') : ''" required maxlength="80" placeholder="Ex.: Consulta financeira" />
+                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                        </div>
+                        @foreach ($permissions as $group => $groupPermissions)
+                            <fieldset class="rounded-xl bg-slate-50 p-3">
+                                <legend class="px-1 text-sm font-semibold text-slate-800">{{ $group }}</legend>
+                                <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    @foreach ($groupPermissions as $key => $label)
+                                        <label class="flex items-start gap-2 text-sm text-slate-600">
+                                            <input type="checkbox" name="permissions[{{ $key }}]" value="1" @checked($newProfilePermissions[$key] ?? false) class="mt-0.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary">
+                                            <span>{{ $label }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </fieldset>
+                        @endforeach
+                        <x-input-error :messages="$errors->get('permissions')" />
+                        <div class="flex justify-end">
+                            <x-primary-button>Criar perfil</x-primary-button>
+                        </div>
+                    </form>
+                </details>
+            </section>
+        @endif
+
+        @if ($isOwner)
+            <section class="rounded-3xl border border-rose-200 bg-rose-50/60 p-5 shadow-sm sm:p-6">
+                <h2 class="font-semibold text-rose-900">Arquivar empresa</h2>
+                <p class="mt-1 max-w-3xl text-sm leading-6 text-rose-800">
+                    A equipe perderá o acesso e a empresa sairá da lista de empresas ativas. Nenhum dado será apagado; você poderá reativá-la pelo seletor de empresas.
+                </p>
+                <form method="POST" action="{{ route('companies.archive', $company) }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    @csrf
+                    <div class="w-full max-w-sm">
+                        <x-input-label for="archive_company_password" value="Confirme sua senha atual" />
+                        <x-text-input id="archive_company_password" name="password" type="password" class="mt-1" required autocomplete="current-password" />
+                        <x-input-error :messages="$errors->get('password')" class="mt-2" />
+                    </div>
+                    <x-danger-button>Arquivar empresa</x-danger-button>
+                </form>
+            </section>
+        @endif
+    </div>
+</x-app-layout>
