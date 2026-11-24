@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PayableHistory;
 use App\Models\RecurringPayable;
 use Illuminate\Support\Carbon;
 
@@ -22,6 +23,52 @@ class RecurringPayableGenerator
             });
 
         return $created;
+    }
+
+    /**
+     * Propaga a edição do contrato para as contas ainda não pagas e gera as que faltam.
+     * Contas pagas nunca são alteradas.
+     */
+    public function syncUnpaidPayables(RecurringPayable $contract, string $oldAmount, ?int $actorId, string $actorName): void
+    {
+        $amountChanged = $oldAmount !== (string) $contract->amount;
+
+        foreach ($contract->payables()->whereNull('paid_at')->lockForUpdate()->get() as $payable) {
+            $month = $payable->due_date->copy()->startOfMonth();
+            $dueDate = $month->copy()->day(min($contract->due_day, $month->daysInMonth));
+
+            if ($dueDate->lt($contract->starts_on) || ($contract->ends_on !== null && $dueDate->gt($contract->ends_on))) {
+                $payable->delete();
+
+                continue;
+            }
+
+            $payable->fill([
+                'unit_id' => $contract->unit_id,
+                'description' => $contract->description,
+                'provider' => $contract->provider,
+                'due_date' => $dueDate->toDateString(),
+            ]);
+
+            if ($amountChanged) {
+                $previous = (string) $payable->amount;
+                $payable->amount = $contract->amount;
+
+                if ($previous !== (string) $contract->amount) {
+                    $payable->histories()->create([
+                        'user_id' => $actorId,
+                        'actor_name' => $actorName,
+                        'action' => PayableHistory::ACTION_AMOUNT_UPDATED,
+                        'old_amount' => $previous,
+                        'new_amount' => $contract->amount,
+                    ]);
+                }
+            }
+
+            $payable->save();
+        }
+
+        $this->generateFor($contract);
     }
 
     public function generateFor(RecurringPayable $contract, ?Carbon $today = null): int
@@ -46,7 +93,7 @@ class RecurringPayableGenerator
                 && ($contract->ends_on === null || $dueDate->lte($contract->ends_on))
             ) {
                 $payable = $contract->payables()
-                    ->whereDate('due_date', $dueDate->toDateString())
+                    ->whereBetween('due_date', [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()])
                     ->firstOrCreate(
                         [],
                         [

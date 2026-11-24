@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\PayableHistory;
 use App\Services\PayableSummary;
 use Illuminate\Http\RedirectResponse;
@@ -138,7 +139,8 @@ class PayableController extends Controller
             ]);
         });
 
-        return back()->with('status', 'payable-updated');
+        return back()->with('status', 'payable-updated')
+            ->with('reopen_contract', $this->contractIdFor($company, $payable));
     }
 
     public function togglePayment(Request $request, int $payable): RedirectResponse
@@ -189,6 +191,12 @@ class PayableController extends Controller
             return 'payable-reopened';
         });
 
-        return back()->with('status', $status);
+        return back()->with('status', $status)
+            ->with('reopen_contract', $this->contractIdFor($company, $payable));
+    }
+
+    private function contractIdFor(Company $company, int $payable): ?int
+    {
+        return $company->payables()->whereKey($payable)->value('recurring_payable_id');
     }
 }

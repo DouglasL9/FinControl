@@ -30,6 +30,7 @@
         'member-permissions-updated' => 'Perfil de acesso do usuário atualizado.',
         'member-role-updated' => 'Papel do usuário atualizado.',
         'contract-created' => 'Contrato recorrente cadastrado.',
+        'contract-updated' => 'Contrato atualizado; as contas não pagas foram ajustadas.',
         'contract-paused' => 'Geração de novas contas pausada.',
         'contract-resumed' => 'Geração de novas contas retomada.',
         'payable-updated' => 'Valor da conta atualizado.',

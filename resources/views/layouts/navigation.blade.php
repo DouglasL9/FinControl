@@ -9,6 +9,7 @@
     @php($isDeveloper = $user->isSystemAdmin() || ($currentCompany?->hasDeveloperProfile($membership) ?? false))
     @php($canViewDashboard =! $hasCompany || ($permissions['dashboard.view'] ?? false))
     @php($canViewPayables = $hasCompany && ($permissions['payables.view'] ?? false))
+    @php($canViewReports = $hasCompany && ($permissions['reports.view'] ?? false))
     @php($canViewCompany = $hasCompany && $currentCompany->canAccessSettings($membership))
 
     <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
@@ -39,6 +40,11 @@
                         @if ($canViewPayables)
                             <x-nav-link :href="route('payables.index')" :active="request()->routeIs('payables.*')" class="rounded-lg px-3 py-2">
                                 Contas a pagar
+                            </x-nav-link>
+                        @endif
+                        @if ($canViewReports)
+                            <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')" class="rounded-lg px-3 py-2">
+                                Relatórios
                             </x-nav-link>
                         @endif
                         @if ($canViewCompany)
@@ -162,6 +168,11 @@
                 @if ($canViewPayables)
                     <x-responsive-nav-link :href="route('payables.index')" :active="request()->routeIs('payables.*')">
                         Contas a pagar
+                    </x-responsive-nav-link>
+                @endif
+                @if ($canViewReports)
+                    <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                        Relatórios
                     </x-responsive-nav-link>
                 @endif
                 @if ($canViewCompany)

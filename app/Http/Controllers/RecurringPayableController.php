@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateRecurringPayableRequest;
 use App\Services\RecurringPayableGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class RecurringPayableController extends Controller
@@ -57,6 +59,37 @@ class RecurringPayableController extends Controller
         $generator->generateFor($contract);
 
         return redirect()->route('payables.index')->with('status', 'contract-created');
+    }
+
+    public function update(
+        UpdateRecurringPayableRequest $request,
+        RecurringPayableGenerator $generator,
+        int $contract,
+    ): RedirectResponse {
+        $company = $request->user()->currentCompany();
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($company, $contract, $validated, $request, $generator): void {
+            $recurringPayable = $company->recurringPayables()->lockForUpdate()->findOrFail($contract);
+            $supplier = $company->suppliers()->findOrFail($validated['supplier_id']);
+            $unit = $company->units()->findOrFail($validated['unit_id']);
+            $oldAmount = (string) $recurringPayable->amount;
+
+            $recurringPayable->update([
+                ...$validated,
+                'unit_id' => $unit->getKey(),
+                'provider' => $supplier->name,
+            ]);
+
+            $generator->syncUnpaidPayables(
+                $recurringPayable->refresh(),
+                $oldAmount,
+                $request->user()->getKey(),
+                $request->user()->name,
+            );
+        });
+
+        return redirect()->route('payables.index')->with('status', 'contract-updated');
     }
 
     public function toggle(Request $request, int $contract): RedirectResponse

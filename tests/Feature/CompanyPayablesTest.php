@@ -1099,3 +1099,168 @@ test('deleting the only company owner removes its unit-linked payable data', fun
     $this->assertDatabaseMissing('recurring_payables', ['id' => $contract->id]);
     $this->assertDatabaseMissing('payables', ['recurring_payable_id' => $contract->id]);
 });
+
+function createContractWithInstallments(User $user, Company $company): RecurringPayable
+{
+    $unit = createUnitForCompany($company);
+    $supplier = createSupplierForCompany($company, 'Provedor');
+    $contract = RecurringPayable::create([
+        'company_id' => $company->id,
+        'unit_id' => $unit->id,
+        'supplier_id' => $supplier->id,
+        'created_by_user_id' => $user->id,
+        'description' => 'Internet',
+        'provider' => 'Provedor',
+        'amount' => 150,
+        'due_day' => 10,
+        'starts_on' => today()->subMonths(2)->startOfMonth()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    (new RecurringPayableGenerator)->generateFor($contract);
+
+    return $contract;
+}
+
+test('editing a contract updates unpaid installments and keeps paid ones untouched', function () {
+    $user = User::factory()->create();
+    $company = createCompanyWithMember($user, 'Empresa');
+    $contract = createContractWithInstallments($user, $company);
+    $newUnit = createUnitForCompany($company, 'Filial');
+    $newSupplier = createSupplierForCompany($company, 'Novo provedor');
+
+    $paid = $contract->payables()->orderBy('due_date')->first();
+    $paid->update(['paid_at' => now(), 'paid_by_user_id' => $user->id]);
+    $paidDate = $paid->due_date->toDateString();
+    $countBefore = $contract->payables()->count();
+
+    $this->actingAs($user)
+        ->get(route('payables.index'))
+        ->assertOk()
+        ->assertSee('Editar contrato');
+
+    $this->patch(route('payables.contracts.update', $contract), [
+        'description' => 'Internet fibra',
+        'supplier_id' => $newSupplier->id,
+        'unit_id' => $newUnit->id,
+        'amount' => '200.00',
+        'due_day' => 20,
+        'starts_on' => $contract->starts_on->toDateString(),
+        'ends_on' => '',
+    ])->assertSessionHasNoErrors()->assertSessionHas('status', 'contract-updated');
+
+    $contract->refresh();
+    $paid->refresh();
+
+    expect($contract->description)->toBe('Internet fibra')
+        ->and($contract->provider)->toBe('Novo provedor')
+        ->and($contract->due_day)->toBe(20)
+        ->and($paid->amount)->toBe('150.00')
+        ->and($paid->description)->toBe('Internet')
+        ->and($paid->due_date->toDateString())->toBe($paidDate)
+        ->and($contract->payables()->count())->toBe($countBefore);
+
+    $unpaid = $contract->payables()->whereNull('paid_at')->get();
+
+    expect($unpaid)->not->toBeEmpty();
+    $unpaid->each(fn (Payable $payable) => expect($payable->amount)->toBe('200.00')
+        ->and($payable->description)->toBe('Internet fibra')
+        ->and($payable->unit_id)->toBe($newUnit->id)
+        ->and($payable->due_date->day)->toBe(20));
+
+    $this->assertDatabaseHas('payable_histories', [
+        'payable_id' => $unpaid->first()->id,
+        'action' => PayableHistory::ACTION_AMOUNT_UPDATED,
+        'new_amount' => '200.00',
+    ]);
+});
+
+test('shortening a contract removes unpaid installments outside the new period only', function () {
+    $user = User::factory()->create();
+    $company = createCompanyWithMember($user, 'Empresa');
+    $contract = createContractWithInstallments($user, $company);
+    $paid = $contract->payables()->orderByDesc('due_date')->first();
+    $paid->update(['paid_at' => now(), 'paid_by_user_id' => $user->id]);
+
+    $this->actingAs($user)->patch(route('payables.contracts.update', $contract), [
+        'description' => 'Internet',
+        'supplier_id' => $contract->supplier_id,
+        'unit_id' => $contract->unit_id,
+        'amount' => '150.00',
+        'due_day' => 10,
+        'starts_on' => $contract->starts_on->toDateString(),
+        'ends_on' => today()->subMonth()->endOfMonth()->toDateString(),
+    ])->assertSessionHasNoErrors();
+
+    expect($contract->payables()->whereNull('paid_at')->where('due_date', '>', today()->subMonth()->endOfMonth())->count())->toBe(0)
+        ->and($paid->fresh())->not->toBeNull();
+});
+
+test('editing a contract validates input and enforces tenancy', function () {
+    $user = User::factory()->create();
+    $company = createCompanyWithMember($user, 'Empresa');
+    $contract = createContractWithInstallments($user, $company);
+    $otherCompany = Company::create(['name' => 'Outra']);
+    $foreignUnit = createUnitForCompany($otherCompany, 'Alheia');
+
+    $this->actingAs($user)->patch(route('payables.contracts.update', $contract), [
+        'description' => '',
+        'supplier_id' => $contract->supplier_id,
+        'unit_id' => $foreignUnit->id,
+        'amount' => '0',
+        'due_day' => 40,
+        'starts_on' => today()->toDateString(),
+        'ends_on' => today()->subDay()->toDateString(),
+    ])->assertSessionHasErrors(['description', 'unit_id', 'amount', 'due_day', 'ends_on']);
+
+    $foreignContract = createContractWithInstallments(User::factory()->create(), $otherCompany);
+
+    $this->patch(route('payables.contracts.update', $foreignContract), [
+        'description' => 'Hack',
+        'supplier_id' => $foreignContract->supplier_id,
+        'unit_id' => $foreignContract->unit_id,
+        'amount' => '10',
+        'due_day' => 5,
+        'starts_on' => today()->toDateString(),
+    ])->assertSessionHasErrors(['supplier_id', 'unit_id']);
+
+    expect($foreignContract->fresh()->description)->toBe('Internet');
+});
+
+test('a member without contract management permission cannot edit a contract', function () {
+    $user = User::factory()->create();
+    $company = createCompanyWithMember($user, 'Empresa');
+    $contract = createContractWithInstallments($user, $company);
+    $viewer = User::factory()->create();
+    $profile = createManagementTestProfile($company, 'Somente leitura', ['payables.view']);
+    $company->users()->attach($viewer->getKey(), ['role' => Company::ROLE_MEMBER, 'permission_profile_id' => $profile->getKey()]);
+
+    $this->actingAs($viewer)->patch(route('payables.contracts.update', $contract), [
+        'description' => 'Hack',
+        'supplier_id' => $contract->supplier_id,
+        'unit_id' => $contract->unit_id,
+        'amount' => '10',
+        'due_day' => 5,
+        'starts_on' => today()->toDateString(),
+    ])->assertForbidden();
+
+    $this->get(route('payables.index'))->assertOk()->assertDontSee('Editar contrato');
+
+    expect($contract->fresh()->description)->toBe('Internet');
+});
+
+test('marking an installment paid flags its contract modal to stay open', function () {
+    $user = User::factory()->create();
+    $company = createCompanyWithMember($user, 'Empresa');
+    $contract = createContractWithInstallments($user, $company);
+    $payable = $contract->payables()->orderBy('due_date')->firstOrFail();
+
+    $this->actingAs($user)
+        ->patch(route('payables.payment.toggle', $payable))
+        ->assertSessionHas('status', 'payable-paid')
+        ->assertSessionHas('reopen_contract', $contract->id);
+
+    $this->get(route('payables.index'))
+        ->assertOk()
+        ->assertSee('x-init="true && $nextTick(() => $refs.installments.showModal())"', false);
+});

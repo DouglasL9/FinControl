@@ -358,6 +358,78 @@
                                                 {{ \Illuminate\Support\Str::plural('parcela', $contract->payables->count()) }}
                                             </span>
                                             @if ($access['manage_contract'])
+                                                @php($editingThis = (int) old('contract_id') === $contract->id)
+                                                <div x-data x-init="@js($editingThis && $errors->any()) && $nextTick(() => $refs.editContract.showModal())">
+                                                    <x-secondary-button type="button" class="whitespace-nowrap"
+                                                        @click="$refs.editContract.showModal()">Editar contrato</x-secondary-button>
+                                                    <dialog x-ref="editContract" aria-modal="true"
+                                                        aria-labelledby="edit-contract-title-{{ $contract->id }}"
+                                                        @click.self="$refs.editContract.close()"
+                                                        class="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60">
+                                                        <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
+                                                            <h2 id="edit-contract-title-{{ $contract->id }}" class="font-semibold text-slate-900">Editar contrato</h2>
+                                                            <p class="mt-1 text-sm leading-6 text-slate-500">As contas já pagas não são alteradas. As contas ainda não pagas serão ajustadas e as que faltarem serão geradas.</p>
+                                                        </div>
+                                                        <form method="POST" action="{{ route('payables.contracts.update', $contract) }}" class="space-y-4 p-5 sm:p-6">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <input type="hidden" name="contract_id" value="{{ $contract->id }}">
+                                                            <div>
+                                                                <x-input-label for="edit-description-{{ $contract->id }}" value="Descrição do serviço" />
+                                                                <x-text-input id="edit-description-{{ $contract->id }}" name="description" class="mt-1" required maxlength="255" :value="$editingThis ? old('description') : $contract->description" />
+                                                                @if ($editingThis)<x-input-error :messages="$errors->get('description')" class="mt-2" />@endif
+                                                            </div>
+                                                            <div>
+                                                                <x-input-label for="edit-supplier-{{ $contract->id }}" value="Fornecedor" />
+                                                                <select id="edit-supplier-{{ $contract->id }}" name="supplier_id" required
+                                                                    class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                                                                    @foreach ($availableSuppliers->when($contract->supplier && ! $availableSuppliers->contains('id', $contract->supplier_id), fn ($list) => $list->push($contract->supplier)) as $supplier)
+                                                                        <option value="{{ $supplier->id }}" @selected(($editingThis ? old('supplier_id') : $contract->supplier_id) == $supplier->id)>{{ $supplier->name }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                                @if ($editingThis)<x-input-error :messages="$errors->get('supplier_id')" class="mt-2" />@endif
+                                                            </div>
+                                                            <div>
+                                                                <x-input-label for="edit-unit-{{ $contract->id }}" value="Unidade / sede" />
+                                                                <select id="edit-unit-{{ $contract->id }}" name="unit_id" required
+                                                                    class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                                                                    @foreach ($availableUnits->when(! $availableUnits->contains('id', $contract->unit_id), fn ($list) => $list->push($contract->unit)) as $unit)
+                                                                        <option value="{{ $unit->id }}" @selected(($editingThis ? old('unit_id') : $contract->unit_id) == $unit->id)>{{ $unit->name }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                                @if ($editingThis)<x-input-error :messages="$errors->get('unit_id')" class="mt-2" />@endif
+                                                            </div>
+                                                            <div class="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <x-input-label for="edit-amount-{{ $contract->id }}" value="Valor mensal (R$)" />
+                                                                    <x-text-input id="edit-amount-{{ $contract->id }}" name="amount" type="number" step="0.01" min="0.01" class="mt-1" required :value="$editingThis ? old('amount') : number_format((float) $contract->amount, 2, '.', '')" />
+                                                                    @if ($editingThis)<x-input-error :messages="$errors->get('amount')" class="mt-2" />@endif
+                                                                </div>
+                                                                <div>
+                                                                    <x-input-label for="edit-due-day-{{ $contract->id }}" value="Dia do vencimento" />
+                                                                    <x-text-input id="edit-due-day-{{ $contract->id }}" name="due_day" type="number" min="1" max="31" class="mt-1" required :value="$editingThis ? old('due_day') : $contract->due_day" />
+                                                                    @if ($editingThis)<x-input-error :messages="$errors->get('due_day')" class="mt-2" />@endif
+                                                                </div>
+                                                            </div>
+                                                            <div class="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <x-input-label for="edit-starts-{{ $contract->id }}" value="Início do contrato" />
+                                                                    <x-text-input id="edit-starts-{{ $contract->id }}" name="starts_on" type="date" class="mt-1" required :value="$editingThis ? old('starts_on') : $contract->starts_on->toDateString()" />
+                                                                    @if ($editingThis)<x-input-error :messages="$errors->get('starts_on')" class="mt-2" />@endif
+                                                                </div>
+                                                                <div>
+                                                                    <x-input-label for="edit-ends-{{ $contract->id }}" value="Término (opcional)" />
+                                                                    <x-text-input id="edit-ends-{{ $contract->id }}" name="ends_on" type="date" class="mt-1" :value="$editingThis ? old('ends_on') : $contract->ends_on?->toDateString()" />
+                                                                    @if ($editingThis)<x-input-error :messages="$errors->get('ends_on')" class="mt-2" />@endif
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                                                <x-secondary-button type="button" @click="$refs.editContract.close()">Cancelar</x-secondary-button>
+                                                                <x-primary-button class="justify-center">Salvar contrato</x-primary-button>
+                                                            </div>
+                                                        </form>
+                                                    </dialog>
+                                                </div>
                                                 <form method="POST"
                                                     action="{{ route('payables.contracts.toggle', $contract) }}">
                                                     @csrf
@@ -368,7 +440,7 @@
                                                 </form>
                                             @endif
                                             @if ($contract->payables->isNotEmpty())
-                                                <div x-data>
+                                                <div x-data x-init="@js((int) session('reopen_contract') === $contract->id) && $nextTick(() => $refs.installments.showModal())">
                                                     <button type="button" @click="$refs.installments.showModal()"
                                                         aria-label="Ver parcelas de {{ $contract->description }}"
                                                         class="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2">

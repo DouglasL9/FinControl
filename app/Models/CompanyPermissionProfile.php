@@ -21,7 +21,10 @@ class CompanyPermissionProfile extends Model
             'payables.create_contract' => 'Cadastrar contratos recorrentes',
             'payables.update_amount' => 'Alterar o valor das parcelas',
             'payables.change_payment_status' => 'Marcar pagamentos e reabrir parcelas',
-            'payables.manage_contract' => 'Pausar e reativar contratos',
+            'payables.manage_contract' => 'Editar, pausar e reativar contratos',
+        ],
+        'Relatórios' => [
+            'reports.view' => 'Visualizar e exportar relatórios',
         ],
         'Unidades' => [
             'units.view' => 'Visualizar unidades',

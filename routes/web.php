@@ -8,8 +8,10 @@ use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\PayableController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringPayableController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
+use App\Services\ReportBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -69,8 +71,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/company-invitations/{token}', [CompanyInvitationController::class, 'accept'])
         ->name('company-invitations.accept');
 
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/{report}', [ReportController::class, 'show'])
+        ->whereIn('report', array_keys(ReportBuilder::TYPES))->name('reports.show');
+    Route::get('/reports/{report}/print', [ReportController::class, 'print'])
+        ->whereIn('report', array_keys(ReportBuilder::TYPES))->name('reports.print');
+    Route::get('/reports/{report}/export', [ReportController::class, 'export'])
+        ->whereIn('report', array_keys(ReportBuilder::TYPES))->name('reports.export');
+
     Route::get('/payables', [PayableController::class, 'index'])->name('payables.index');
     Route::post('/payables/contracts', [RecurringPayableController::class, 'store'])->name('payables.contracts.store');
+    Route::patch('/payables/contracts/{contract}', [RecurringPayableController::class, 'update'])
+        ->name('payables.contracts.update');
     Route::patch('/payables/contracts/{contract}/toggle', [RecurringPayableController::class, 'toggle'])
         ->name('payables.contracts.toggle');
     Route::patch('/payables/{payable}', [PayableController::class, 'update'])->name('payables.update');
